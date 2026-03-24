@@ -4,23 +4,23 @@
 
 AI agents are powerful — but opaque. They spawn sub-agents, call tools, read and write files, make network requests, and burn through tokens, all behind the scenes. Project Telescope gives you a window into all of it without sending a single byte off your machine.
 
-This repo contains the **collector plugin system** — the open-source layer that captures telemetry from AI agents like GitHub Copilot, Claude, and any MCP-compatible agent. Write your own collectors for your agents and applications, or use the built-in ones. The Project Telescope service, dashboard, and CLI are available to be installed below.
+This repo contains the **collector plugin system** — the open-source layer that captures telemetry from AI agents like GitHub Copilot, Claude, and any agent with a collector. Write your own collectors for your agents and applications, or use the built-in ones. The Project Telescope service, dashboard, and CLI are available to be installed below.
 
 ---
 
 ## What is Project Telescope?
 
-Project Telescope is a local-first observability tool for AI agents and MCPs, giving teams cross agent visibility into what agents did, why they did it, and where they got stuck. Think of it as `htop` for your AI agents: a live, structured view of everything happening beneath the surface.
+Project Telescope is a local-first observability tool for AI agents and MCPs, giving teams cross agent visibility into what agents did, why they did it, and where they got stuck. 
 
-It works with GitHub Copilot CLI, Claude, and any agent running on your machine. It requires no changes to your agents or your MCP servers. And **all data stays on your machine** — no cloud, no telemetry leaving your system, no third parties involved.
+It works with GitHub Copilot CLI, Claude, and any agent running on your machine with a collector. It requires no changes to your agents or your MCP servers. And **all data stays on your machine** — no cloud, no telemetry leaving your system, no third parties involved.
 
 - **Faster debugging, audit trails, and iteration** — captures tool calls, conversation turns, reasoning and decisions, and friction signals in one place.
 - **Background data collectors** — feed a set of local SQLite databases (`~/.telescope/*.db`) with no manual instrumentation required.
 - **Privacy-first** — runs entirely on-device with no API keys or cloud dependency.
 - **CLI** — `tele watch`, `tele sessions`, `tele insights`, `tele export`, and more, on Windows, macOS, and Linux.
-- **Desktop dashboard  — an app for visual exploration of agent sessions, leaderboards, and execution graphs.
+- **Desktop dashboard**  — an app for visual exploration of agent sessions, leaderboards, and execution graphs.
 
-Think "DevTools for your AI pair programmer," purpose-built for local workflows. No config files, no API keys, no cloud accounts. Everything runs locally; everything stays on your machine. 
+Think "DevTools for your AI pair programmer," purpose-built for local workflows. No config files, no API keys, no cloud accounts. Everything runs locally. 
 
 ---
 
@@ -125,56 +125,6 @@ These ship with Project Telescope and serve as reference implementations for bui
 A collector is a standalone binary that implements the [`Collector`](src/crates/collector-sdk/src/lib.rs) trait and connects to the Telescope service over IPC. The SDK handles pipe connection, registration, batching, backpressure, reconnection, and graceful shutdown — you just implement `manifest()`, `collect()`, and `interval()`.
 
 For a complete step-by-step walkthrough, see the **[Collector Authoring Guide](docs/collector-authoring-guide.md)**. For a working starter template, see the **[Hello World example](examples/hello_world/)**.
-
-### The C-ABI contract
-
-```c
-// Identity
-const char* telescope_collector_name(void);
-const char* telescope_collector_version(void);
-
-// Lifecycle
-int32_t telescope_collector_start(
-    TelescopeCollectorHandle* wal_handle,
-    const char* config_json
-);
-int32_t telescope_collector_stop(void);
-
-// Data collection
-int32_t telescope_collector_scan_once(...);
-int32_t telescope_collector_process_event(
-    const char* raw_event_json,
-    char** canonical_events_json,
-    void* user_data
-);
-```
-
-### The collector manifest
-
-Every collector ships with a `collector.toml` that describes what it is and how it should run:
-
-```toml
-[collector]
-name = "my-custom-collector"
-version = "0.1.0"
-description = "Collects telemetry from <agent name>"
-library = "telescope_collector_my_custom.dll"
-collector_type = "custom"
-capture_method = "log_import"
-
-[config]
-scan_interval_secs = 15
-watch_dirs = ["~/.my-agent/"]
-```
-
-### Installing your collector
-
-```bash
-tele collector install ./path/to/my-collector/
-tele collector enable my-custom-collector
-tele collector list    # verify it's loaded
-tele collector info my-custom-collector
-```
 
 ---
 
