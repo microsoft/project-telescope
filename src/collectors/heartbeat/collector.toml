@@ -1,0 +1,7 @@
+[collector]
+name = "heartbeat"
+version = "0.1.0"
+description = "Simple test collector that emits periodic heartbeat events."
+executable = "telescope-collector-heartbeat"
+lifecycle = "managed"
+author = "Telescope"

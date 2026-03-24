@@ -1,0 +1,23 @@
+[package]
+name = "telescope-collector-hello-world"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "A minimal hello world collector for Project Telescope."
+
+[[bin]]
+name = "telescope-collector-hello-world"
+path = "src/main.rs"
+
+[dependencies]
+telescope-collector-sdk = { workspace = true }
+async-trait = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+
+[lints]
+workspace = true

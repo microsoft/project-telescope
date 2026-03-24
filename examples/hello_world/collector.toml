@@ -1,0 +1,7 @@
+[collector]
+name = "hello-world"
+version = "0.1.0"
+description = "A minimal hello world collector that emits a greeting event on each collect cycle."
+executable = "telescope-collector-hello-world"
+lifecycle = "managed"
+author = "Telescope Examples"
