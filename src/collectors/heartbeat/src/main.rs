@@ -36,7 +36,6 @@ impl Collector for HeartbeatCollector {
             description: "Simple test collector that emits periodic heartbeat events.".into(),
             provenance: ProvenanceConfig {
                 collector_type: "manual".into(),
-                confidence: 1.0,
                 capture_method: "volunteered".into(),
             },
         }

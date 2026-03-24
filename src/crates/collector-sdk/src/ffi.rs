@@ -47,7 +47,7 @@ const ERR_NULL_POINTER: i32 = -8;
 /// Initialize the SDK: connect to the Telescope service and register.
 ///
 /// `manifest_json`: JSON string with fields `name`, `version`, `description`,
-/// and `provenance` (object with `collector_type`, `confidence`, `capture_method`).
+/// and `provenance` (object with `collector_type`, `capture_method`).
 ///
 /// Returns a positive handle on success, or a negative error code on failure.
 ///
@@ -87,7 +87,6 @@ pub unsafe extern "C" fn telescope_sdk_init(manifest_json: *const c_char) -> i64
                 "description": manifest["description"].as_str().unwrap_or(""),
                 "provenance": manifest.get("provenance").cloned().unwrap_or(serde_json::json!({
                     "collector_type": "manual",
-                    "confidence": 0.5,
                     "capture_method": "volunteered"
                 })),
                 "pid": std::process::id(),

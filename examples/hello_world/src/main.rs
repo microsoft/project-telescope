@@ -48,7 +48,6 @@ impl Collector for HelloWorldCollector {
             description: "A minimal hello world collector.".into(),
             provenance: ProvenanceConfig {
                 collector_type: "manual".into(),
-                confidence: 1.0,
                 capture_method: "volunteered".into(),
             },
         }

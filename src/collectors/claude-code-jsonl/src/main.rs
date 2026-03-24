@@ -34,7 +34,6 @@ impl Collector for ClaudeCodeJsonlCollector {
             description: "Imports Claude Code session data from JSONL conversation logs.".into(),
             provenance: ProvenanceConfig {
                 collector_type: "session_log".into(),
-                confidence: 0.80,
                 capture_method: "post_hoc_log_parse".into(),
             },
         }

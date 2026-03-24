@@ -402,15 +402,6 @@ pub enum EventKind {
         /// Why it was rejected.
         reason: String,
     },
-    /// Agent assessed its confidence level.
-    ConfidenceAssessed {
-        /// Turn ID.
-        turn_id: Uuid,
-        /// What is being assessed.
-        subject: String,
-        /// Confidence level (0.0–1.0).
-        level: f64,
-    },
     /// Agent made an assumption.
     AssumptionMade {
         /// Turn ID.
@@ -664,7 +655,6 @@ impl EventKind {
             Self::ObservationLogged { .. } => "observation_logged",
             Self::RecipeFollowed { .. } => "recipe_followed",
             Self::PathNotTaken { .. } => "path_not_taken",
-            Self::ConfidenceAssessed { .. } => "confidence_assessed",
             Self::AssumptionMade { .. } => "assumption_made",
             Self::ModelUsed { .. } => "model_used",
             Self::ModelSwitched { .. } => "model_switched",

@@ -48,7 +48,7 @@ extern "C" {
  *
  * @param manifest_json  JSON string: {"name": "...", "version": "...",
  *                       "description": "...", "provenance": {"collector_type": "...",
- *                       "confidence": 0.8, "capture_method": "..."}}
+ *                       "capture_method": "..."}}
  * @return  Positive handle on success, negative error code on failure.
  */
 int64_t telescope_sdk_init(const char* manifest_json);

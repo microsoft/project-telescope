@@ -35,8 +35,6 @@ pub struct RegisterParams {
 pub struct ProvenanceParams {
     /// Maps to [`CollectorType`](crate::provenance::CollectorType) variant name.
     pub collector_type: String,
-    /// Confidence score (0.0–1.0).
-    pub confidence: f64,
     /// Maps to [`CaptureMethod`](crate::provenance::CaptureMethod) variant name.
     pub capture_method: String,
 }

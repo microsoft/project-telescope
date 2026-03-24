@@ -128,7 +128,6 @@ impl Collector for HelloWorldCollector {
             description: "A minimal hello world collector.".into(),
             provenance: ProvenanceConfig {
                 collector_type: "manual".into(),
-                confidence: 1.0,
                 capture_method: "volunteered".into(),
             },
         }
@@ -191,15 +190,14 @@ async fn main() -> anyhow::Result<()> {
 
 ### Provenance
 
-Every collector declares its provenance — how trustworthy and how fresh the data is:
+Every collector declares its provenance — where the data came from and how it was captured:
 
 | Field | Options | Description |
 |-------|---------|-------------|
 | `collector_type` | `mcp_proxy`, `copilot_sdk`, `session_log`, `process_scan`, `self_report`, `manual`, ... | How the data was obtained |
-| `confidence` | 0.0 – 1.0 | How reliable the data is |
 | `capture_method` | `live_intercept`, `live_sdk_hook`, `post_hoc_log_parse`, `snapshot`, `volunteered`, `inferred` | When/how the data was captured |
 
-For a hello world example, `manual` / `volunteered` / `1.0` is appropriate because the collector is self-reporting synthetic data.
+For a hello world example, `manual` / `volunteered` is appropriate because the collector is self-reporting synthetic data.
 
 ## Step 4: Build
 

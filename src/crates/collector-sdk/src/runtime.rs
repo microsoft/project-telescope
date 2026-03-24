@@ -158,7 +158,6 @@ async fn register(
             "description": manifest.description,
             "provenance": {
                 "collector_type": manifest.provenance.collector_type,
-                "confidence": manifest.provenance.confidence,
                 "capture_method": manifest.provenance.capture_method,
             },
             "pid": std::process::id(),

@@ -1,4 +1,4 @@
-//! Provenance model — tracks data origin, capture method, and confidence.
+//! Provenance model — tracks data origin and capture method.
 
 use serde::{Deserialize, Serialize};
 
@@ -9,8 +9,6 @@ pub struct Provenance {
     pub collector_type: CollectorType,
     /// Unique identifier for the collector instance that produced this.
     pub source_id: String,
-    /// How confident we are in this data (0.0–1.0).
-    pub confidence: f64,
     /// How the data was captured.
     pub capture_method: CaptureMethod,
     /// If corroborated by another source, reference it.
@@ -18,40 +16,30 @@ pub struct Provenance {
 }
 
 impl Provenance {
-    /// Create a minimal provenance for the given collector with its default confidence.
+    /// Create a minimal provenance for the given collector.
     #[must_use]
     pub fn new(collector_type: CollectorType, source_id: String) -> Self {
-        let (confidence, capture_method) = match &collector_type {
-            CollectorType::McpProxy => (0.95, CaptureMethod::LiveIntercept),
-            CollectorType::CopilotSdk => (0.92, CaptureMethod::LiveSdkHook),
-            CollectorType::OsKernel => (0.90, CaptureMethod::LiveKernelEvent),
-            CollectorType::SessionLog => (0.80, CaptureMethod::PostHocLogParse),
-            CollectorType::ProcessScan => (0.60, CaptureMethod::Snapshot),
-            CollectorType::SelfReport => (0.55, CaptureMethod::Volunteered),
-            CollectorType::Bridge { .. } => (0.90, CaptureMethod::LiveIntercept),
-            CollectorType::Manual => (0.30, CaptureMethod::Volunteered),
+        let capture_method = match &collector_type {
+            CollectorType::McpProxy => CaptureMethod::LiveIntercept,
+            CollectorType::CopilotSdk => CaptureMethod::LiveSdkHook,
+            CollectorType::OsKernel => CaptureMethod::LiveKernelEvent,
+            CollectorType::SessionLog => CaptureMethod::PostHocLogParse,
+            CollectorType::ProcessScan => CaptureMethod::Snapshot,
+            CollectorType::SelfReport => CaptureMethod::Volunteered,
+            CollectorType::Bridge { .. } => CaptureMethod::LiveIntercept,
+            CollectorType::Manual => CaptureMethod::Volunteered,
         };
         Self {
             collector_type,
             source_id,
-            confidence,
             capture_method,
             corroborated_by: None,
         }
     }
 
-    /// Boost confidence by corroborating with another provenance source.
-    /// Uses the formula: `min(1.0, self.confidence + other.confidence × 0.5)`.
+    /// Record corroboration with another provenance source.
     pub fn corroborate(&mut self, other: Provenance) {
-        self.confidence = (self.confidence + other.confidence * 0.5).min(1.0);
         self.corroborated_by = Some(Box::new(other));
-    }
-
-    /// Compute inherited confidence for bridge-forwarded data.
-    /// Original confidence × 0.90 for the network hop.
-    #[must_use]
-    pub fn bridge_inherited_confidence(&self) -> f64 {
-        self.confidence * 0.90
     }
 }
 

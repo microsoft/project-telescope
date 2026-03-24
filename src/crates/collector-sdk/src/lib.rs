@@ -29,7 +29,6 @@
 //!             description: "My custom collector".into(),
 //!             provenance: ProvenanceConfig {
 //!                 collector_type: "session_log".into(),
-//!                 confidence: 0.80,
 //!                 capture_method: "post_hoc_log_parse".into(),
 //!             },
 //!         }
@@ -75,8 +74,6 @@ pub struct CollectorManifest {
 pub struct ProvenanceConfig {
     /// Maps to a `CollectorType` variant name (e.g. `"session_log"`).
     pub collector_type: String,
-    /// Confidence score (0.0–1.0).
-    pub confidence: f64,
     /// Maps to a `CaptureMethod` variant name (e.g. `"post_hoc_log_parse"`).
     pub capture_method: String,
 }
