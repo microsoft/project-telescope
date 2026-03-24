@@ -1,3 +1,8 @@
+// This is a shared types crate — many constants and structs are part of the
+// public API surface but only consumed by the service side or by collector
+// authors in specific scenarios. Suppress dead_code warnings so the full
+// protocol is available without noise.
+#![allow(dead_code)]
 //! Shared types for building Telescope collectors.
 //!
 //! This crate provides the public types that collector authors need:
