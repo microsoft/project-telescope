@@ -261,16 +261,8 @@ Your collector can emit any of the ~40 canonical event types. The most commonly 
 
 See `src/crates/collector-types/src/canonical/events.rs` for the full list.
 
-## Tips
-
-- **Deterministic IDs**: Use `Uuid::new_v5` with a stable seed so the same agent/session always gets the same ID across collector restarts.
-- **Bootstrap events**: Always emit `AgentDiscovered` + `SessionStarted` the first time you encounter a session. The service needs these to associate subsequent events.
-- **Backpressure**: The SDK respects `delay_hint_ms` from the service automatically. If the service is overwhelmed, your collector will slow down.
-- **Batching**: The SDK batches up to 500 events per submit. Just return all events from `collect()` and the SDK handles the rest.
-- **Reconnection**: If the pipe disconnects, the SDK reconnects with exponential backoff. Your `collect()` implementation should be stateful enough to resume.
 
 ## Next steps
 
 - Browse `src/collectors/heartbeat/` for the simplest built-in collector.
 - Browse `src/collectors/copilot-jsonl/` for a real-world file-based collector with incremental scanning.
-- See the C-ABI header at `src/crates/collector-sdk/include/telescope_collector_sdk.h` if you want to write a collector in C, Go, Python, or another language.

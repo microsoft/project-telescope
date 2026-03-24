@@ -122,7 +122,9 @@ These ship with Project Telescope and serve as reference implementations for bui
 
 ## Writing your own collector
 
-A collector is a `cdylib` shared library that exports a handful of C-ABI entry points. You can write collectors in Rust (using the SDK in `crates/cabi/`), or in any language that can produce a C-compatible shared library — C, C++, Go, Python via FFI, whatever you like.
+A collector is a standalone binary that implements the [`Collector`](src/crates/collector-sdk/src/lib.rs) trait and connects to the Telescope service over IPC. The SDK handles pipe connection, registration, batching, backpressure, reconnection, and graceful shutdown — you just implement `manifest()`, `collect()`, and `interval()`.
+
+For a complete step-by-step walkthrough, see the **[Collector Authoring Guide](docs/collector-authoring-guide.md)**. For a working starter template, see the **[Hello World example](examples/hello_world/)**.
 
 ### The C-ABI contract
 
@@ -200,29 +202,6 @@ Collectors emit events in a canonical format. The service understands ~40 event 
 | **Cost** | `TokenUsageReported`, `RateLimitHit` |
 | **Git** | `GitCommitCreated`, `GitBranchCreated`, `PullRequestCreated` |
 | **Catch-all** | `Custom { event_type, data }` |
-
----
-
-## Repo structure
-
-```
-microsoft/project-telescope/
-├── src/
-│   ├── crates/
-│   │   ├── core/              # Core types, canonical events, WAL schema
-│   │   └── cabi/              # C-ABI client SDK for building collectors
-│   └── collectors/
-│       ├── mcp_proxy/         # Built-in: MCP Proxy collector
-│       ├── copilot_sdk/       # Built-in: GitHub Copilot SDK collector
-│       ├── copilot_jsonl/     # Built-in: GitHub Copilot JSONL collector
-│       ├── claude_jsonl/      # Built-in: Claude JSONL collector
-│       ├── process_scan/      # Built-in: Process Scan collector
-│       └── self_report/       # Built-in: Self-Report collector
-├── examples/                  # Example third-party collector
-|   └── collector.toml             # Manifest schema reference
-├── docs/                      # Collector authoring guide
-└── README.md
-```
 
 ---
 
