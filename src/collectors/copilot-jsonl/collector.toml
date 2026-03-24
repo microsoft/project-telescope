@@ -1,0 +1,7 @@
+[collector]
+name = "copilot-jsonl"
+version = "0.1.0"
+description = "Imports Copilot CLI session data from JSONL event logs."
+executable = "telescope-collector-copilot-jsonl"
+lifecycle = "managed"
+author = "Telescope"

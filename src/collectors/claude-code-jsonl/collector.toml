@@ -1,0 +1,7 @@
+[collector]
+name = "claude-code-jsonl"
+version = "0.1.0"
+description = "Imports Claude Code session data from JSONL conversation logs."
+executable = "telescope-collector-claude-code-jsonl"
+lifecycle = "managed"
+author = "Telescope"

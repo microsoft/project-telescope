@@ -1,0 +1,22 @@
+[package]
+name = "telescope-collector-heartbeat"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "A simple test collector that emits periodic heartbeat events."
+
+[[bin]]
+name = "telescope-collector-heartbeat"
+path = "src/main.rs"
+
+[dependencies]
+telescope-collector-sdk = { workspace = true }
+async-trait = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+anyhow = { workspace = true }
+
+[lints]
+workspace = true

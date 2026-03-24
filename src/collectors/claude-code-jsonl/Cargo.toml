@@ -1,0 +1,25 @@
+[package]
+name = "telescope-collector-claude-code-jsonl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Collector that imports Claude Code session data from JSONL conversation logs."
+
+[[bin]]
+name = "telescope-collector-claude-code-jsonl"
+path = "src/main.rs"
+
+[dependencies]
+telescope-collector-sdk = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+dirs = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+anyhow = { workspace = true }
+
+[lints]
+workspace = true
