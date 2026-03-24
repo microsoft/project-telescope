@@ -55,7 +55,7 @@ anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 ```
 
-> **Tip:** If you are developing inside the project-telescope workspace, use `{ workspace = true }` for shared dependencies instead of pinning versions.
+> **Tip:** If you are developing inside the project-telescope workspace, use `{ workspace = true }` for shared dependencies instead of pinning versions. See `\examples\hello_world\Cargo.toml` for an example to use workspace.
 
 ## Step 2: Write the collector manifest
 
@@ -210,11 +210,11 @@ The binary lands in `target/release/telescope-collector-hello-world` (or `.exe` 
 ## Step 5: Install and run
 
 ```bash
-# Install the collector (copies binary + collector.toml into Telescope's collector directory)
-tele collector install ./examples/hello_world/
+# Install the collector 
+tele collector install ./target/release/telescope-collector-hello-world/
 
 # Enable it so the service starts managing it
-tele collector enable hello-world
+tele collectors enable hello-world
 
 # Verify it's loaded
 tele collector list
