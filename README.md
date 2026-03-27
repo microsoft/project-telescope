@@ -6,6 +6,8 @@ AI agents are powerful — but opaque. They spawn sub-agents, call tools, read a
 
 This repo contains the **collector plugin system** — the open-source layer that captures telemetry from AI agents like GitHub Copilot, Claude, and any agent with a collector. Write your own collectors for your agents and applications, or use the built-in ones. The Project Telescope service, dashboard, and CLI are available to be installed below.
 
+Read the announcement blog post: [Project Telescope](https://breviu.com/posts/telescope)
+
 ---
 
 ## What is Project Telescope?
@@ -20,9 +22,12 @@ It works with GitHub Copilot CLI, Claude, and any agent running on your machine 
 - **CLI** — `tele watch`, `tele sessions`, `tele insights`, `tele export`, and more, on Windows, macOS, and Linux.
 - **Desktop dashboard**  — an app for visual exploration of agent sessions, leaderboards, and execution graphs.
 
-Think "DevTools for your AI pair programmer," purpose-built for local workflows. No config files, no API keys, no cloud accounts. Everything runs locally. 
+Think "DevTools for your AI pair programmer," purpose-built for local workflows. No config files, no API keys, no cloud accounts. Everything runs locally.
 
 ---
+
+<img src="imgs/sideeffectdetails.png" alt="Side effect details for a session" width="500">
+<img src="imgs/tokenusage.png" alt="Token usage tracking across agents and models" width="500">
 
 ## Quickstart
 
@@ -169,7 +174,6 @@ Project Telescope is local-first by design.
 - **All data is user-scoped** — SQLite databases live in your platform's user data directory (`%LOCALAPPDATA%` on Windows, `~/Library/Application Support` on macOS, `~/.local/share` on Linux).
 
 ---
-
 ## Contributing
 
 We welcome contributions to the collector plugin system. Before submitting a pull request, you'll need to sign the [Microsoft Contributor License Agreement (CLA)](https://cla.opensource.microsoft.com/).
