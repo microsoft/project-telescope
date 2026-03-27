@@ -28,28 +28,28 @@ Think "DevTools for your AI pair programmer," purpose-built for local workflows.
 
 ### 1. Install Project Telescope
 
-**Windows**
+**Windows (PowerShell)**
 
-```
-winget install telescope
+```powershell
+irm https://raw.githubusercontent.com/microsoft/project-telescope/main/install.ps1 | iex
 ```
 
-Or download the MSI installer from the [releases page](https://github.com/microsoft/project-telescope/releases). This installs the background service, dashboard,  `tele` CLI, and all built-in collectors. 
+This downloads and runs the MSI installer, which sets up the background service, dashboard, `tele` CLI, and all built-in collectors. You can also download the MSI directly from the [releases page](https://github.com/microsoft/project-telescope/releases).
 
 **macOS**
 
 ```bash
-curl -fsSL https://aka.ms/telescope/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/microsoft/project-telescope/main/install.sh | bash
 ```
 
 **Linux**
 
 ```bash
-curl -fsSL https://aka.ms/telescope/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/microsoft/project-telescope/main/install.sh | bash
 ```
 
 
-All platforms install the full stack: the background service, the `tele` CLI, and all built-in collectors. Nothing leaves your machine.
+All platforms install the full stack: the background service, dashboard, `tele` CLI, and all built-in collectors. On macOS and Linux, the install script also registers the service to start automatically via launchd or systemd.
 
 ### 2. Verify it's running
 
@@ -81,27 +81,27 @@ That's it. Your collector is now feeding events into the same pipeline as the bu
 
 ## How it works
 
-Project Telescope has two layers: an open-source **collector** layer (this repo) and a **service** layer (installed via winget/MSI).
+Project Telescope has two layers: an open-source **collector** layer (this repo) and a **service** layer (installed via the install scripts or MSI).
 
-Collectors are shared libraries (`.dll` files) that watch AI agents and emit structured events. The service ingests those events, promotes them through a pipeline, and surfaces insights in the dashboard and CLI.
+Collectors are standalone executables that watch AI agents and emit structured events. The service ingests those events, promotes them through a pipeline, and surfaces insights in the dashboard and CLI.
 
 ```
   Agent (GitHub Copilot, Claude, etc.)
               │
-              │  stdin/stdout, JSONL files, SDK hooks
+              │  stdin/stdout, JSONL files
               ▼
-  Collector (.dll plugin)        ← you are here (open-source)
+  Collector     ← you are here (open-source)
               │
-              │  Canonical events
+              │  
               ▼
-  Project Telescope Service  ← installed via winget
+  Project Telescope Service  ← installed via install script / MSI
               │
         ┌─────┴─────┐
         ▼           ▼
    Dashboard       CLI
 ```
 
-The key design principle: **every collector uses the exact same C-ABI interface**. There is no privileged native path. A collector you write has identical capabilities to a built-in one.
+The key design principle: **every collector uses the exact same SDK interface**. There is no privileged native path. A collector you write has identical capabilities to a built-in one.
 
 ---
 
@@ -109,14 +109,12 @@ The key design principle: **every collector uses the exact same C-ABI interface*
 
 These ship with Project Telescope and serve as reference implementations for building your own.
 
-| Collector         | Type       | What it captures                                      |     |
-| ----------------- | ---------- | ----------------------------------------------------- | --- |
-| **MCP Proxy**     | Real-time  | JSON-RPC stdin/stdout interception from any MCP agent |     |
-| **GitHub Copilot SDK**   | Real-time  | Hook events from GitHub Copilot CLI                          |     |
-| **GitHub Copilot JSONL** | File-based | Scans `events.jsonl` session logs                     |     |
-| **Claude JSONL**  | File-based | Imports Claude CLI exports                            |     |
-| **Process Scan**  | One-shot   | Discovers AI agent OS processes                       |     |
-| **Self-Report**   | Real-time  | MCP tool calls for agent self-reporting               |     |
+| Collector         | Type       | What it captures                                      |
+| ----------------- | ---------- | ----------------------------------------------------- |
+| **MCP Proxy**     | Real-time  | JSON-RPC stdin/stdout interception from any MCP agent |
+| **GitHub Copilot JSONL** | File-based | Scans `events.jsonl` session logs                |
+| **Claude JSONL**  | File-based | Imports Claude CLI exports                            |
+| **Process Scan**  | One-shot   | Discovers AI agent OS processes                       |
 
 ---
 
