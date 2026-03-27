@@ -259,6 +259,548 @@ Your collector can emit any of the ~40 canonical event types. The most commonly 
 
 See `src/crates/collector-types/src/canonical/events.rs` for the full list.
 
+## Event JSON format
+
+Events are serialized as JSON using an internally tagged representation. Every event object has a `"type"` field that identifies the variant, with all other fields alongside it. Optional fields are omitted when `null`.
+
+### Serialization rules
+
+| Type | JSON representation | Example |
+|------|-------------------|---------|
+| UUID | Standard string | `"550e8400-e29b-41d4-a716-446655440000"` |
+| DateTime | ISO 8601 UTC | `"2024-01-15T10:30:45.123456Z"` |
+| Optional field | Omitted if None | field absent from object |
+| Enum variant | `snake_case` string | `"agent_discovered"` |
+
+### Wire protocol
+
+Collectors communicate with the Telescope service over local IPC (named pipes on Windows, Unix sockets on Linux/macOS) using a length-prefixed frame protocol:
+
+```
+[4-byte little-endian length][JSON payload]
+```
+
+Maximum frame size is 16 MiB. The SDK handles framing automatically — you only work with `EventKind` values.
+
+### IPC message flow
+
+**1. Registration** — the SDK sends this automatically from your `manifest()`:
+
+```json
+{
+  "method": "collector.register",
+  "params": {
+    "name": "hello-world",
+    "version": "0.1.0",
+    "description": "A minimal hello world collector.",
+    "provenance": {
+      "collector_type": "manual",
+      "capture_method": "volunteered"
+    },
+    "pid": 12345,
+    "expected_interval_secs": 15
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "result": {
+    "status": "registered",
+    "collector_id": "hello-world",
+    "max_batch_size": 500
+  }
+}
+```
+
+**2. Event submission** — the SDK batches your `collect()` return values and sends them:
+
+```json
+{
+  "method": "collector.submit",
+  "params": {
+    "events": [
+      { "type": "agent_discovered", "agent_id": "...", "name": "..." },
+      { "type": "session_started", "session_id": "...", "agent_id": "..." }
+    ]
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "result": {
+    "accepted": 2,
+    "delay_hint_ms": 0
+  }
+}
+```
+
+The `delay_hint_ms` field signals backpressure — the SDK automatically waits when the service is overloaded. Maximum batch size is 500 events.
+
+### Event reference
+
+Below is the JSON shape for every canonical event type, grouped by category. **Required** fields are always present; **optional** fields are omitted when not set.
+
+#### Agent events
+
+```json
+// AgentDiscovered — register a new agent
+{
+  "type": "agent_discovered",
+  "agent_id": "550e8400-e29b-41d4-a716-446655440000",  // required, UUID
+  "name": "my-agent",                                    // required
+  "agent_type": "copilot",                               // required
+  "executable_path": "/usr/bin/my-agent",                // optional
+  "version": "1.0.0"                                     // optional
+}
+
+// AgentHeartbeat — signal agent is alive
+{
+  "type": "agent_heartbeat",
+  "agent_id": "550e8400-e29b-41d4-a716-446655440000"    // required, UUID
+}
+```
+
+#### Session events
+
+```json
+// SessionStarted
+{
+  "type": "session_started",
+  "session_id": "...",   // required, UUID
+  "agent_id": "...",     // required, UUID
+  "cwd": "/home/user/project",      // optional
+  "git_repo": "owner/repo",         // optional
+  "git_branch": "main"              // optional
+}
+
+// SessionEnded
+{
+  "type": "session_ended",
+  "session_id": "...",       // required, UUID
+  "status": "completed",    // required: "completed", "failed", "cancelled"
+  "duration_ms": 120000     // optional
+}
+
+// SessionResumed
+{
+  "type": "session_resumed",
+  "session_id": "..."       // required, UUID
+}
+
+// SessionMetadataUpdated
+{
+  "type": "session_metadata_updated",
+  "session_id": "...",       // required, UUID
+  "metadata": { }           // required, arbitrary JSON object
+}
+
+// SessionModeChanged
+{
+  "type": "session_mode_changed",
+  "session_id": "...",           // required, UUID
+  "previous_mode": "interactive", // required
+  "new_mode": "plan"             // required
+}
+```
+
+#### Turn events
+
+```json
+// UserMessage
+{
+  "type": "user_message",
+  "session_id": "...",   // required, UUID
+  "turn_id": "...",      // required, UUID
+  "content": "What does this function do?"  // optional
+}
+
+// TurnStarted
+{
+  "type": "turn_started",
+  "session_id": "...",    // required, UUID
+  "turn_id": "...",       // required, UUID
+  "turn_index": 0,        // required, 0-based counter
+  "model_name": "gpt-4"   // optional
+}
+
+// TurnCompleted
+{
+  "type": "turn_completed",
+  "session_id": "...",
+  "turn_id": "...",
+  "user_message": "...",            // optional
+  "assistant_response": "...",      // optional
+  "model_name": "gpt-4",           // optional
+  "tokens": {                       // optional, arbitrary JSON
+    "input_tokens": 150,
+    "output_tokens": 320
+  },
+  "duration_ms": 5000,              // optional
+  "status": "completed"             // required: "completed", "failed"
+}
+
+// TurnStreaming
+{
+  "type": "turn_streaming",
+  "turn_id": "...",                  // required, UUID
+  "partial_content": "The function...", // optional
+  "tokens_so_far": 45               // optional
+}
+```
+
+#### Tool events
+
+```json
+// ToolCallStarted
+{
+  "type": "tool_call_started",
+  "turn_id": "...",       // required, UUID
+  "effect_id": "...",     // required, UUID — unique invocation ID
+  "name": "search_code",  // required
+  "arguments": { }        // optional, arbitrary JSON input
+}
+
+// ToolCallCompleted
+{
+  "type": "tool_call_completed",
+  "effect_id": "...",       // required, UUID — matches ToolCallStarted
+  "status": "succeeded",    // required: "succeeded", "failed"
+  "result": { },            // optional, arbitrary JSON output
+  "duration_ms": 1200       // optional
+}
+```
+
+#### File I/O events
+
+All file events share the same shape:
+
+```json
+// FileRead, FileWritten, FileCreated, FileDeleted
+{
+  "type": "file_read",        // or "file_written", "file_created", "file_deleted"
+  "turn_id": "...",            // optional, UUID
+  "path": "/src/main.rs"      // required
+}
+```
+
+#### Shell command events
+
+```json
+// ShellCommandStarted
+{
+  "type": "shell_command_started",
+  "turn_id": "...",                    // optional, UUID
+  "effect_id": "...",                  // required, UUID
+  "command": "cargo build --release",  // required
+  "cwd": "/home/user/project"         // optional
+}
+
+// ShellCommandCompleted
+{
+  "type": "shell_command_completed",
+  "effect_id": "...",       // required, UUID — matches ShellCommandStarted
+  "exit_code": 0,           // optional
+  "duration_ms": 45000      // optional
+}
+```
+
+#### Sub-agent events
+
+```json
+// SubAgentSpawned
+{
+  "type": "sub_agent_spawned",
+  "turn_id": "...",                  // optional, UUID
+  "effect_id": "...",                // required, UUID
+  "agent_type": "search_specialist", // required
+  "prompt": "Find all references"    // optional
+}
+
+// SubAgentCompleted
+{
+  "type": "sub_agent_completed",
+  "effect_id": "...",       // required, UUID
+  "status": "succeeded",    // required
+  "duration_ms": 8000       // optional
+}
+```
+
+#### Planning and reasoning events
+
+```json
+// PlanCreated
+{
+  "type": "plan_created",
+  "turn_id": "...",                          // optional, UUID
+  "content": "1. Search\n2. Analyze\n3. Fix" // required
+}
+
+// PlanStepCompleted
+{
+  "type": "plan_step_completed",
+  "turn_id": "...",                // optional, UUID
+  "step": "Search for usages"     // required
+}
+
+// ThinkingBlock
+{
+  "type": "thinking_block",
+  "turn_id": "...",                          // optional, UUID
+  "content": "I need to consider backwards compatibility..." // required
+}
+```
+
+#### Context window events
+
+```json
+// ContextWindowSnapshot
+{
+  "type": "context_window_snapshot",
+  "session_id": "...",       // required, UUID
+  "total_tokens": 45000,     // required
+  "max_tokens": 100000       // required
+}
+
+// ContextPruned
+{
+  "type": "context_pruned",
+  "session_id": "...",        // required, UUID
+  "tokens_removed": 5000     // required
+}
+```
+
+#### Human-in-the-loop events
+
+```json
+// ApprovalRequested
+{
+  "type": "approval_requested",
+  "turn_id": "...",                  // optional, UUID
+  "action": "Delete 5 files in /tmp" // required
+}
+
+// ApprovalGranted
+{
+  "type": "approval_granted",
+  "turn_id": "..."                   // optional, UUID
+}
+
+// ApprovalDenied
+{
+  "type": "approval_denied",
+  "turn_id": "...",                  // optional, UUID
+  "reason": "Unsafe operation"       // optional
+}
+
+// UserFeedback
+{
+  "type": "user_feedback",
+  "turn_id": "...",                  // optional, UUID
+  "content": "Looks good",          // required
+  "sentiment": "positive"           // optional: "positive", "negative", "neutral"
+}
+```
+
+#### Self-report events
+
+```json
+// IntentDeclared
+{ "type": "intent_declared", "turn_id": "...", "intent": "Implement caching" }
+
+// DecisionMade
+{
+  "type": "decision_made",
+  "turn_id": "...",
+  "decision": "Use Redis",
+  "reasoning": "Fast, supports TTL",                 // optional
+  "alternatives": ["Memcached", "Local in-memory"]   // optional
+}
+
+// ThoughtLogged
+{ "type": "thought_logged", "turn_id": "...", "content": "This is O(n²)", "category": "optimization" }
+
+// FrustrationReported
+{ "type": "frustration_reported", "turn_id": "...", "issue": "Docs outdated", "severity": "high" }
+
+// OutcomeReported
+{ "type": "outcome_reported", "turn_id": "...", "outcome": "Refactored 12 functions", "success": true }
+
+// ObservationLogged
+{ "type": "observation_logged", "turn_id": "...", "observation": "All tests pass" }
+
+// AssumptionMade
+{ "type": "assumption_made", "turn_id": "...", "assumption": "DB returns sorted results" }
+
+// PathNotTaken
+{ "type": "path_not_taken", "turn_id": "...", "path": "ML approach", "reason": "Insufficient data" }
+
+// RecipeFollowed
+{ "type": "recipe_followed", "turn_id": "...", "recipe": "add_logging_to_function" }
+```
+
+#### Model events
+
+```json
+// ModelUsed
+{
+  "type": "model_used",
+  "session_id": "...",        // required, UUID
+  "name": "gpt-4-turbo",     // required
+  "provider": "OpenAI",      // optional
+  "tokens": { "input_tokens": 2500, "output_tokens": 800 },  // optional
+  "cost": { "currency": "USD", "amount": 0.084 },            // optional
+  "invocation_count": 3      // optional
+}
+
+// ModelSwitched
+{
+  "type": "model_switched",
+  "session_id": "...",            // required, UUID
+  "from_model": "gpt-3.5-turbo", // required
+  "to_model": "gpt-4-turbo"      // required
+}
+```
+
+#### Error events
+
+```json
+// ErrorOccurred
+{
+  "type": "error_occurred",
+  "turn_id": "...",                          // optional, UUID
+  "session_id": "...",                       // optional, UUID
+  "message": "File not found: config.json",  // required
+  "category": "file_system"                  // optional
+}
+
+// RetryAttempted
+{
+  "type": "retry_attempted",
+  "turn_id": "...",                  // optional, UUID
+  "attempt": 2,                      // required
+  "reason": "Timeout on API call"    // optional
+}
+```
+
+#### Code events
+
+```json
+// SearchPerformed
+{
+  "type": "search_performed",
+  "turn_id": "...",                 // optional, UUID
+  "query": "function getUserById",  // required
+  "result_count": 12                // optional
+}
+
+// CodeChangeApplied
+{
+  "type": "code_change_applied",
+  "turn_id": "...",              // optional, UUID
+  "path": "/src/user_service.rs", // required
+  "change_type": "edit"          // required: "edit", "create", "delete"
+}
+```
+
+#### Network events
+
+```json
+// WebRequestMade
+{
+  "type": "web_request_made",
+  "turn_id": "...",                          // optional, UUID
+  "url": "https://api.github.com/repos/...", // required
+  "method": "GET",                           // optional
+  "status_code": 200                         // optional
+}
+
+// McpServerConnected
+{
+  "type": "mcp_server_connected",
+  "session_id": "...",          // required, UUID
+  "server_name": "filesystem"   // required
+}
+```
+
+#### Cost and rate events
+
+```json
+// TokenUsageReported
+{
+  "type": "token_usage_reported",
+  "turn_id": "...",            // optional, UUID
+  "input_tokens": 1500,        // required
+  "output_tokens": 300,        // required
+  "cache_read_tokens": 100     // optional
+}
+
+// RateLimitHit
+{
+  "type": "rate_limit_hit",
+  "session_id": "...",         // required, UUID
+  "retry_after_secs": 60       // optional
+}
+```
+
+#### Git events
+
+```json
+// GitCommitCreated
+{ "type": "git_commit_created", "turn_id": "...", "sha": "abc123...", "message": "Add caching" }
+
+// GitBranchCreated
+{ "type": "git_branch_created", "turn_id": "...", "branch": "feature/cache" }
+
+// PullRequestCreated
+{ "type": "pull_request_created", "turn_id": "...", "identifier": "123", "title": "Add caching" }
+```
+
+#### Catch-all event
+
+Use `Custom` for any application-specific event that doesn't fit the canonical types:
+
+```json
+{
+  "type": "custom",
+  "event_type": "hello_world",     // required, your custom event name
+  "data": {                        // required, arbitrary JSON payload
+    "message": "Hello from Telescope!",
+    "tick": 42
+  }
+}
+```
+
+### Provenance values
+
+Every collector declares provenance in its manifest. Valid values:
+
+| `collector_type` | Description |
+|-----------------|-------------|
+| `mcp_proxy` | Live MCP traffic interception |
+| `copilot_sdk` | Copilot SDK event hooks |
+| `session_log` | Log file post-hoc parsing |
+| `process_scan` | OS process enumeration |
+| `os_kernel` | Kernel-level tracing (ETW, eBPF) |
+| `self_report` | Agent self-reporting |
+| `manual` | Manual user entry |
+| `bridge` | Cross-device forwarding |
+
+| `capture_method` | Description |
+|------------------|-------------|
+| `live_intercept` | Real-time traffic interception |
+| `live_sdk_hook` | Real-time SDK callbacks |
+| `live_kernel_event` | Real-time OS events |
+| `post_hoc_log_parse` | Log parsing after the fact |
+| `snapshot` | One-time process scan |
+| `volunteered` | Agent self-reported |
+| `inferred` | Heuristic inference |
+
 
 ## Next steps
 
