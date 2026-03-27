@@ -30,7 +30,7 @@ detect_platform() {
 }
 
 find_local_archive() {
-    local asset_name="telescope-${OS}-${ARCH}.zip"
+    local asset_name="telescope-${OS}-${ARCH}.tar.gz"
     LOCAL_ARCHIVE="${SCRIPT_DIR}/${asset_name}"
 
     if [ ! -f "$LOCAL_ARCHIVE" ]; then
@@ -50,10 +50,11 @@ install() {
     trap 'rm -rf "$tmp_dir"' EXIT
 
     # Extract
-    if ! command -v unzip &>/dev/null; then
-        error "unzip is required to install Project Telescope"
+    if ! command -v tar &>/dev/null; then
+        error "tar is required to install Project Telescope"
     fi
-    unzip -qo "$LOCAL_ARCHIVE" -d "$tmp_dir/extracted"
+    mkdir -p "$tmp_dir/extracted"
+    tar -xzf "$LOCAL_ARCHIVE" -C "$tmp_dir/extracted"
 
     # Install binaries
     mkdir -p "$BIN_DIR"
