@@ -28,10 +28,10 @@ Think "DevTools for your AI pair programmer," purpose-built for local workflows.
 
 ### 1. Install Project Telescope
 
-**Windows (PowerShell)**
+**Windows**
 
 ```powershell
-irm https://raw.githubusercontent.com/microsoft/project-telescope/main/install.ps1 | iex
+winget install Microsoft.ProjectTelescope
 ```
 
 This downloads and runs the MSI installer, which sets up the background service, dashboard, `tele` CLI, and all built-in collectors. You can also download the MSI directly from the [releases page](https://github.com/microsoft/project-telescope/releases).
@@ -39,9 +39,12 @@ This downloads and runs the MSI installer, which sets up the background service,
 **macOS / Linux**
 
 ```bash
+# Download and extract
+unzip project-telescope-linux-x64.zip -d ~/.telescope
+# Add to PATH
+export PATH="$HOME/.telescope:$PATH"
 ./install.sh
 ```
-
 
 All platforms install the full stack: the background service, dashboard, `tele` CLI, and all built-in collectors. On macOS and Linux, the install script also registers the service to start automatically via launchd or systemd.
 
@@ -57,6 +60,7 @@ tele doctor
 tele watch        # Live stream of agent activity
 tele sessions     # Browse recent sessions
 tele insights     # Surface patterns and anomalies
+tele dashboard    # Launches the dashboard
 ```
 
 ### 4. (Optional) Build a custom collector
