@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Project Telescope installer for macOS and Linux
-# Usage: curl -fsSL https://raw.githubusercontent.com/microsoft/project-telescope/main/install.sh | bash
+# Usage: ./install.sh (run from the root of the repository)
 
 set -euo pipefail
 
-REPO="microsoft/project-telescope"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="${TELESCOPE_INSTALL_DIR:-$HOME/.telescope}"
 BIN_DIR="$INSTALL_DIR/bin"
-VERSION="${TELESCOPE_VERSION:-latest}"
 
 info() { printf '\033[1;34m%s\033[0m\n' "$*"; }
 error() { printf '\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -30,41 +29,31 @@ detect_platform() {
     esac
 }
 
-get_download_url() {
+find_local_archive() {
     local asset_name="telescope-${OS}-${ARCH}.zip"
+    LOCAL_ARCHIVE="${SCRIPT_DIR}/${asset_name}"
 
-    if [ "$VERSION" = "latest" ]; then
-        DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${asset_name}"
-    else
-        DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${asset_name}"
+    if [ ! -f "$LOCAL_ARCHIVE" ]; then
+        error "Could not find ${asset_name} in ${SCRIPT_DIR}. Build or download the archive first."
     fi
 }
 
 install() {
     detect_platform
-    get_download_url
+    find_local_archive
 
     info "Installing Project Telescope for ${OS}/${ARCH}..."
-    info "Download: ${DOWNLOAD_URL}"
+    info "Source: ${LOCAL_ARCHIVE}"
 
     local tmp_dir
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "$tmp_dir"' EXIT
 
-    # Download
-    if command -v curl &>/dev/null; then
-        curl -fsSL "$DOWNLOAD_URL" -o "$tmp_dir/telescope.zip"
-    elif command -v wget &>/dev/null; then
-        wget -q "$DOWNLOAD_URL" -O "$tmp_dir/telescope.zip"
-    else
-        error "curl or wget is required to download Project Telescope"
-    fi
-
     # Extract
     if ! command -v unzip &>/dev/null; then
         error "unzip is required to install Project Telescope"
     fi
-    unzip -qo "$tmp_dir/telescope.zip" -d "$tmp_dir/extracted"
+    unzip -qo "$LOCAL_ARCHIVE" -d "$tmp_dir/extracted"
 
     # Install binaries
     mkdir -p "$BIN_DIR"
