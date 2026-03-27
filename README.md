@@ -36,14 +36,24 @@ winget install Microsoft.ProjectTelescope
 
 This downloads and runs the MSI installer, which sets up the background service, dashboard, `tele` CLI, and all built-in collectors. You can also download the MSI directly from the [releases page](https://github.com/microsoft/project-telescope/releases).
 
-**macOS / Linux**
+**macOS**
 
 ```bash
 # Download and extract
-unzip project-telescope-linux-x64.zip -d ~/.telescope
+unzip telescope-macos-arm64.zip -d ~/.telescope
 # Add to PATH
 export PATH="$HOME/.telescope:$PATH"
 ./install.sh
+```
+
+**Linux**
+
+```bash
+# Download and extract
+unzip telescope-linux-arm64.zip -d ~/.telescope
+# Add to PATH
+export PATH="$HOME/.telescope:$PATH"
+sed -i 's/\r$//' install.sh && ./install.sh
 ```
 
 All platforms install the full stack: the background service, dashboard, `tele` CLI, and all built-in collectors. On macOS and Linux, the install script also registers the service to start automatically via launchd or systemd.
