@@ -75,6 +75,72 @@ install() {
 
     # Add to PATH
     add_to_path
+
+    # Start the service
+    start_service
+}
+
+start_service() {
+    local service_bin="$BIN_DIR/telescope-service"
+    if [ ! -x "$service_bin" ]; then
+        info "telescope-service not found, skipping service setup."
+        return
+    fi
+
+    if [ "$OS" = "macos" ]; then
+        local plist_dir="$HOME/Library/LaunchAgents"
+        local plist="$plist_dir/com.microsoft.telescope.plist"
+        mkdir -p "$plist_dir"
+        cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.microsoft.telescope</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${service_bin}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${INSTALL_DIR}/logs/service.log</string>
+    <key>StandardErrorPath</key>
+    <string>${INSTALL_DIR}/logs/service.err</string>
+</dict>
+</plist>
+PLIST
+        mkdir -p "$INSTALL_DIR/logs"
+        launchctl unload "$plist" 2>/dev/null || true
+        launchctl load "$plist"
+        info "telescope-service registered and started via launchd."
+
+    elif [ "$OS" = "linux" ]; then
+        local systemd_dir="$HOME/.config/systemd/user"
+        local unit="$systemd_dir/telescope.service"
+        mkdir -p "$systemd_dir"
+        cat > "$unit" <<UNIT
+[Unit]
+Description=Project Telescope Service
+After=default.target
+
+[Service]
+ExecStart=${service_bin}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+UNIT
+        mkdir -p "$INSTALL_DIR/logs"
+        systemctl --user daemon-reload
+        systemctl --user enable telescope.service
+        systemctl --user restart telescope.service
+        info "telescope-service registered and started via systemd."
+    fi
 }
 
 add_to_path() {

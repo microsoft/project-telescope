@@ -49,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/microsoft/project-telescope/main/in
 ```
 
 
-On Windows, the MSI installs the background service, dashboard, `tele` CLI, and all built-in collectors. On macOS and Linux, the install script places the `tele` CLI and built-in collectors into `~/.telescope/bin`. Nothing leaves your machine.
+All platforms install the full stack: the background service, dashboard, `tele` CLI, and all built-in collectors. On macOS and Linux, the install script also registers the service to start automatically via launchd or systemd.
 
 ### 2. Verify it's running
 
