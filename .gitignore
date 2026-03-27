@@ -20,3 +20,6 @@ target
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 release/
+telescope-linux-x64-tarball.zip
+telescope-linux-x64-zip.zip
+telescope-linux-x64.zip

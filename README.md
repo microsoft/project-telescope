@@ -36,16 +36,10 @@ irm https://raw.githubusercontent.com/microsoft/project-telescope/main/install.p
 
 This downloads and runs the MSI installer, which sets up the background service, dashboard, `tele` CLI, and all built-in collectors. You can also download the MSI directly from the [releases page](https://github.com/microsoft/project-telescope/releases).
 
-**macOS**
+**macOS / Linux**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/microsoft/project-telescope/main/install.sh | bash
-```
-
-**Linux**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/microsoft/project-telescope/main/install.sh | bash
+./install.sh
 ```
 
 
