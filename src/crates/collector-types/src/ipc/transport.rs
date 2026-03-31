@@ -1,20 +1,22 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Platform-aware IPC transport — named pipes (Windows) / unix domain sockets (Unix).
 //!
-//! Each [`IpcChannel`] defines a logical channel (control, reader) with its own
-//! platform-specific path. The service creates an [`IpcListener`] for each channel.
-//! Clients connect via [`IpcStream::connect`].
+//! [`IpcChannel`] defines the collector channel with its platform-specific path.
+//! Collectors connect via [`IpcStream::connect`].
 //!
 //! On Windows, named pipes only accept one client at a time per instance.
-//! The listener pre-creates the next pipe instance before returning each
+//! The service pre-creates the next pipe instance before returning each
 //! accepted connection, so there is always an instance ready for the next
-//! client. This allows concurrent readers (CLI + dashboard + MCP tools).
+//! client.
 
 use std::path::PathBuf;
 
 /// A named IPC channel with a platform-specific path.
 #[derive(Debug, Clone)]
 pub struct IpcChannel {
-    /// Logical name (e.g. `"control"`, `"reader"`).
+    /// Logical name (e.g. `"collector"`).
     pub name: String,
     /// Platform-specific path to the pipe/socket.
     pub path: PathBuf,
@@ -30,16 +32,6 @@ impl IpcChannel {
             name: name.to_string(),
             path: default_path(name),
         }
-    }
-
-    /// The **control** channel — CLI ↔ Service.
-    pub fn control() -> Self {
-        Self::default_for("control")
-    }
-
-    /// The **reader** channel — external tools ↔ Service (Phase 3).
-    pub fn reader() -> Self {
-        Self::default_for("reader")
     }
 
     /// The **collector** channel — out-of-process collectors → Service.

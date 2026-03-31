@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Scanner — discovers and reads Copilot JSONL session files.
 //!
 //! Scans `~/.copilot/session-state/*/events.jsonl` for new events,

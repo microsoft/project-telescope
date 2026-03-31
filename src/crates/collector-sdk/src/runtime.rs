@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! SDK runtime — manages connection, registration, collect loop, and shutdown.
 
 use std::time::Duration;
@@ -22,13 +25,15 @@ const MAX_BACKOFF: Duration = Duration::from_secs(60);
 
 /// Run the collector's main loop.
 pub(crate) async fn run_collector(mut collector: impl Collector) -> Result<()> {
-    // Initialize logging.
-    tracing_subscriber::fmt()
+    // Initialize logging — write to stderr to avoid corrupting stdout.
+    // Uses try_init() so callers can set up their own tracing subscriber first.
+    let _ = tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
-        .init();
+        .try_init();
 
     let manifest = collector.manifest();
     info!(
@@ -67,7 +72,8 @@ async fn connect_and_run(collector: &mut impl Collector) -> Result<()> {
 
     // Register.
     let manifest = collector.manifest();
-    let register_resp = register(&mut stream, &manifest).await?;
+    let agent_config = collector.agent();
+    let register_resp = register(&mut stream, &manifest, &agent_config).await?;
     info!(
         collector_id = %register_resp.collector_id,
         max_batch_size = register_resp.max_batch_size,
@@ -149,6 +155,7 @@ async fn connect_with_retry(channel: &IpcChannel) -> Result<IpcStream> {
 async fn register(
     stream: &mut IpcStream,
     manifest: &crate::CollectorManifest,
+    agent: &crate::AgentConfig,
 ) -> Result<RegisterResponse> {
     let request = IpcRequest::new(
         "collector.register",
@@ -156,9 +163,11 @@ async fn register(
             "name": manifest.name,
             "version": manifest.version,
             "description": manifest.description,
-            "provenance": {
-                "collector_type": manifest.provenance.collector_type,
-                "capture_method": manifest.provenance.capture_method,
+            "agent": {
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "agent_type": agent.agent_type,
+                "version": agent.version,
             },
             "pid": std::process::id(),
             "expected_interval_secs": null,
@@ -193,7 +202,7 @@ async fn collect_loop(stream: &mut IpcStream, collector: &mut impl Collector) ->
         time::sleep(wait).await;
 
         // Collect events.
-        let events: Vec<crate::EventKind> = match collector.collect().await {
+        let events = match collector.collect().await {
             Ok(events) => events,
             Err(e) => {
                 error!(error = %e, "collect() failed, skipping this cycle");

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! IPC protocol — request/response types.
 //!
 //! Simple JSON-RPC-inspired protocol: `{ "method": "...", "params": {...} }`
@@ -61,7 +64,7 @@ pub mod error_codes {
     pub const AGENT_NOT_FOUND: i32 = -32004;
     /// The collector is already registered on this connection.
     pub const COLLECTOR_ALREADY_REGISTERED: i32 = -32005;
-    /// Backpressure overload — too many unpromoted events in the canonical store.
+    /// Backpressure overload — too many pending events in the store.
     pub const BACKPRESSURE_OVERLOAD: i32 = -32006;
     /// The collector must register before submitting events.
     pub const REGISTRATION_REQUIRED: i32 = -32007;

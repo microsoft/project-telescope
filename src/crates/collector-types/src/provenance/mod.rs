@@ -1,4 +1,7 @@
-//! Provenance model — tracks data origin and capture method.
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+//! Provenance model — tracks data origin, capture method, and confidence.
 
 use serde::{Deserialize, Serialize};
 
@@ -9,37 +12,31 @@ pub struct Provenance {
     pub collector_type: CollectorType,
     /// Unique identifier for the collector instance that produced this.
     pub source_id: String,
+    /// How confident we are in this data (0.0–1.0).
+    pub confidence: f64,
     /// How the data was captured.
     pub capture_method: CaptureMethod,
-    /// If corroborated by another source, reference it.
-    pub corroborated_by: Option<Box<Provenance>>,
 }
 
 impl Provenance {
-    /// Create a minimal provenance for the given collector.
+    /// Create a minimal provenance for the given collector with its default confidence.
     #[must_use]
     pub fn new(collector_type: CollectorType, source_id: String) -> Self {
-        let capture_method = match &collector_type {
-            CollectorType::McpProxy => CaptureMethod::LiveIntercept,
-            CollectorType::CopilotSdk => CaptureMethod::LiveSdkHook,
-            CollectorType::OsKernel => CaptureMethod::LiveKernelEvent,
-            CollectorType::SessionLog => CaptureMethod::PostHocLogParse,
-            CollectorType::ProcessScan => CaptureMethod::Snapshot,
-            CollectorType::SelfReport => CaptureMethod::Volunteered,
-            CollectorType::Bridge { .. } => CaptureMethod::LiveIntercept,
-            CollectorType::Manual => CaptureMethod::Volunteered,
+        let (confidence, capture_method) = match &collector_type {
+            CollectorType::McpProxy => (0.95, CaptureMethod::LiveIntercept),
+            CollectorType::CopilotSdk => (0.92, CaptureMethod::LiveSdkHook),
+            CollectorType::OsKernel => (0.90, CaptureMethod::LiveKernelEvent),
+            CollectorType::SessionLog => (0.80, CaptureMethod::PostHocLogParse),
+            CollectorType::SelfReport => (0.55, CaptureMethod::Volunteered),
+            CollectorType::Bridge { .. } => (0.90, CaptureMethod::LiveIntercept),
+            CollectorType::Manual => (0.30, CaptureMethod::Volunteered),
         };
         Self {
             collector_type,
             source_id,
+            confidence,
             capture_method,
-            corroborated_by: None,
         }
-    }
-
-    /// Record corroboration with another provenance source.
-    pub fn corroborate(&mut self, other: Provenance) {
-        self.corroborated_by = Some(Box::new(other));
     }
 }
 
@@ -54,8 +51,6 @@ pub enum CollectorType {
     SelfReport,
     /// Session log file import (Copilot `events.jsonl`, Claude logs).
     SessionLog,
-    /// Process scanner (snapshot of running processes).
-    ProcessScan,
     /// Copilot SDK hooks — live event stream via hooks.json + SDK event API.
     CopilotSdk,
     /// Cross-device bridge (forwarded from another Telescope instance).
@@ -68,7 +63,7 @@ pub enum CollectorType {
 }
 
 impl CollectorType {
-    /// Serialize to a string tag for `SQLite` storage.
+    /// Serialize to a string tag for storage.
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
@@ -76,7 +71,6 @@ impl CollectorType {
             Self::OsKernel => "os_kernel",
             Self::SelfReport => "self_report",
             Self::SessionLog => "session_log",
-            Self::ProcessScan => "process_scan",
             Self::CopilotSdk => "copilot_sdk",
             Self::Bridge { .. } => "bridge",
             Self::Manual => "manual",
@@ -104,7 +98,7 @@ pub enum CaptureMethod {
 }
 
 impl CaptureMethod {
-    /// Serialize to a string tag for `SQLite` storage.
+    /// Serialize to a string tag for storage.
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
@@ -118,7 +112,7 @@ impl CaptureMethod {
         }
     }
 
-    /// Parse from a string tag stored in `SQLite`.
+    /// Parse from a string tag.
     #[must_use]
     pub fn from_str_tag(s: &str) -> Self {
         match s {

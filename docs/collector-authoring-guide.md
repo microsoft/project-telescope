@@ -5,7 +5,7 @@ This guide walks you through building, running, and installing a custom Project 
 ## Prerequisites
 
 - **Rust 1.94+** — install from [rustup.rs](https://rustup.rs)
-- **Project Telescope service** — installed and running (`tele doctor` to verify)
+- **Project Telescope service** — installed and running
 - A clone of this repo:
   ```bash
   git clone https://github.com/microsoft/project-telescope.git
@@ -17,8 +17,9 @@ This guide walks you through building, running, and installing a custom Project 
 A collector is a standalone binary that connects to the Telescope service over a local IPC pipe, registers itself, and periodically submits canonical events. The SDK handles all the plumbing — pipe connection, registration, batching, backpressure, reconnection, and graceful shutdown. You just implement three things:
 
 1. **`manifest()`** — who is this collector?
-2. **`collect()`** — what events should it emit right now?
-3. **`interval()`** — how often should `collect()` be called?
+2. **`agent()`** — what agent identity does this collector report as?
+3. **`collect()`** — what events should it emit right now?
+4. **`interval()`** — how often should `collect()` be called?
 
 ## Project layout
 
@@ -74,7 +75,7 @@ Key fields:
 
 | Field | Description |
 |-------|-------------|
-| `name` | Unique identifier for the collector. Used in `tele collector enable <name>`. |
+| `name` | Unique identifier for the collector. |
 | `version` | Semantic version string. |
 | `description` | Human-readable summary. |
 | `executable` | Binary name produced by `cargo build`. |
@@ -87,7 +88,7 @@ Key fields:
 // src/main.rs
 use std::time::Duration;
 
-use telescope_collector_sdk::{Collector, CollectorManifest, EventKind, ProvenanceConfig};
+use telescope_collector_sdk::{Collector, CollectorManifest, AgentConfig, EventKind};
 use uuid::Uuid;
 
 fn agent_id() -> Uuid {
@@ -126,10 +127,15 @@ impl Collector for HelloWorldCollector {
             name: "hello-world".into(),
             version: "0.1.0".into(),
             description: "A minimal hello world collector.".into(),
-            provenance: ProvenanceConfig {
-                collector_type: "manual".into(),
-                capture_method: "volunteered".into(),
-            },
+        }
+    }
+
+    fn agent(&self) -> AgentConfig {
+        AgentConfig {
+            agent_id: self.agent_id,
+            name: "hello-world-agent".into(),
+            agent_type: "example".into(),
+            version: Some("0.1.0".into()),
         }
     }
 
@@ -137,7 +143,7 @@ impl Collector for HelloWorldCollector {
         self.tick += 1;
         let mut events = Vec::new();
 
-        // Bootstrap: emit agent + session discovery on first cycle.
+        // On the first cycle, emit agent + session events.
         if !self.started {
             self.started = true;
             events.push(EventKind::AgentDiscovered {
@@ -188,16 +194,16 @@ async fn main() -> anyhow::Result<()> {
 2. **Every cycle** (every 15 seconds): emits a `Custom` event with a hello message and a tick counter.
 3. **Shutdown**: the SDK handles Ctrl-C / SIGTERM and calls `stop()`.
 
-### Provenance
+### Agent identity
 
-Every collector declares its provenance — where the data came from and how it was captured:
+Every collector declares its agent identity via the `agent()` method. This is sent during registration so the service knows what agent the collector represents:
 
-| Field | Options | Description |
-|-------|---------|-------------|
-| `collector_type` | `mcp_proxy`, `copilot_sdk`, `session_log`, `process_scan`, `self_report`, `manual`, ... | How the data was obtained |
-| `capture_method` | `live_intercept`, `live_sdk_hook`, `post_hoc_log_parse`, `snapshot`, `volunteered`, `inferred` | When/how the data was captured |
-
-For a hello world example, `manual` / `volunteered` is appropriate because the collector is self-reporting synthetic data.
+| Field | Description |
+|-------|-------------|
+| `agent_id` | A stable UUID identifying this agent instance |
+| `name` | Human-readable agent name |
+| `agent_type` | Category of agent (e.g. `"copilot"`, `"example"`, `"custom"`) |
+| `version` | Optional version string |
 
 ## Step 4: Build
 
@@ -209,23 +215,18 @@ The binary lands in `target/release/telescope-collector-hello-world` (or `.exe` 
 
 ## Step 5: Install and run
 
-```bash
-# Install the collector 
-tele collector install ./target/release/telescope-collector-hello-world/
-
-# Enable it so the service starts managing it
-tele collectors enable hello-world
-
-# Verify it's loaded
-tele collector list
-tele collector info hello-world
-```
-
-To see events flowing:
+Copy the built binary and the `collector.toml` manifest into the Telescope collectors directory (`~/.telescope/collectors/hello-world/` on all platforms).
 
 ```bash
-tele watch
+# Create the collector directory
+mkdir -p ~/.telescope/collectors/hello-world
+
+# Copy the binary and manifest
+cp target/release/telescope-collector-hello-world ~/.telescope/collectors/hello-world/
+cp collector.toml ~/.telescope/collectors/hello-world/
 ```
+
+Restart the Telescope service (or start it if not running). If the collector has `lifecycle = "managed"`, the service will start it automatically.
 
 You should see `AgentDiscovered`, `SessionStarted`, and periodic `hello_world` custom events.
 
@@ -235,7 +236,7 @@ To rebuild and reinstall after making changes:
 
 ```bash
 cargo build --release -p telescope-collector-hello-world
-tele collector install ./examples/hello_world/
+cp target/release/telescope-collector-hello-world ~/.telescope/collectors/hello-world/
 ```
 
 The service will pick up the new binary automatically.
@@ -261,7 +262,7 @@ See `src/crates/collector-types/src/canonical/events.rs` for the full list.
 
 ## Event JSON format
 
-Events are serialized as JSON using an internally tagged representation. Every event object has a `"type"` field that identifies the variant, with all other fields alongside it. Optional fields are omitted when `null`.
+Events are serialized as JSON using serde's **internally-tagged** enum representation. Each event is a flat JSON object with a `"type"` field containing the snake_case variant name, and all event fields at the top level. Optional fields are omitted when `null`.
 
 ### Serialization rules
 
@@ -270,11 +271,14 @@ Events are serialized as JSON using an internally tagged representation. Every e
 | UUID | Standard string | `"550e8400-e29b-41d4-a716-446655440000"` |
 | DateTime | ISO 8601 UTC | `"2024-01-15T10:30:45.123456Z"` |
 | Optional field | Omitted if None | field absent from object |
-| Enum variant | `snake_case` string | `"agent_discovered"` |
+| Enum variant | `"type"` field, snake_case | `{ "type": "agent_discovered", ... }` |
 
 ### Wire protocol
 
-Collectors communicate with the Telescope service over local IPC (named pipes on Windows, Unix sockets on Linux/macOS) using a length-prefixed frame protocol:
+Collectors communicate with the Telescope service over local IPC using a length-prefixed frame protocol. The collector channel name is `telescope-collector`:
+
+- **Windows**: `\\.\pipe\telescope-collector`
+- **Unix (Linux/macOS)**: `~/.telescope/collector.sock`
 
 ```
 [4-byte little-endian length][JSON payload]
@@ -284,7 +288,7 @@ Maximum frame size is 16 MiB. The SDK handles framing automatically — you only
 
 ### IPC message flow
 
-**1. Registration** — the SDK sends this automatically from your `manifest()`:
+**1. Registration** — the SDK sends this automatically from your `manifest()` and `agent()`:
 
 ```json
 {
@@ -293,9 +297,11 @@ Maximum frame size is 16 MiB. The SDK handles framing automatically — you only
     "name": "hello-world",
     "version": "0.1.0",
     "description": "A minimal hello world collector.",
-    "provenance": {
-      "collector_type": "manual",
-      "capture_method": "volunteered"
+    "agent": {
+      "agent_id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "hello-world-agent",
+      "agent_type": "example",
+      "version": "0.1.0"
     },
     "pid": 12345,
     "expected_interval_secs": 15
@@ -322,7 +328,7 @@ Response:
   "method": "collector.submit",
   "params": {
     "events": [
-      { "type": "agent_discovered", "agent_id": "...", "name": "..." },
+      { "type": "agent_discovered", "agent_id": "...", "name": "...", "agent_type": "...", "version": "1.0.0" },
       { "type": "session_started", "session_id": "...", "agent_id": "..." }
     ]
   }
@@ -344,7 +350,7 @@ The `delay_hint_ms` field signals backpressure — the SDK automatically waits w
 
 ### Event reference
 
-Below is the JSON shape for every canonical event type, grouped by category. **Required** fields are always present; **optional** fields are omitted when not set.
+Below is the JSON shape for every canonical event type, grouped by category. **Required** fields are always present; **optional** fields are omitted when not set. Each event is a flat JSON object with a `"type"` field identifying the variant.
 
 #### Agent events
 
@@ -483,9 +489,9 @@ All file events share the same shape:
 ```json
 // FileRead, FileWritten, FileCreated, FileDeleted
 {
-  "type": "file_read",        // or "file_written", "file_created", "file_deleted"
-  "turn_id": "...",            // optional, UUID
-  "path": "/src/main.rs"      // required
+  "type": "file_read",      // or "file_written", "file_created", "file_deleted"
+  "turn_id": "...",          // optional, UUID
+  "path": "/src/main.rs"     // required
 }
 ```
 
@@ -776,33 +782,34 @@ Use `Custom` for any application-specific event that doesn't fit the canonical t
 }
 ```
 
-### Provenance values
+## IPC protocol reference
 
-Every collector declares provenance in its manifest. Valid values:
+The collector communicates with the Telescope service using JSON-RPC-style messages over the `telescope-collector` IPC channel. The four message types are:
 
-| `collector_type` | Description |
-|-----------------|-------------|
-| `mcp_proxy` | Live MCP traffic interception |
-| `copilot_sdk` | Copilot SDK event hooks |
-| `session_log` | Log file post-hoc parsing |
-| `process_scan` | OS process enumeration |
-| `os_kernel` | Kernel-level tracing (ETW, eBPF) |
-| `self_report` | Agent self-reporting |
-| `manual` | Manual user entry |
-| `bridge` | Cross-device forwarding |
+| Method | Description |
+|--------|-------------|
+| `collector.register` | Register the collector with the service. Sends manifest + agent identity. |
+| `collector.submit` | Submit a batch of events (max 500 events per batch). |
+| `collector.heartbeat` | Signal liveness. The service expects heartbeats at the declared interval. |
+| `collector.deregister` | Gracefully deregister. The SDK sends this on shutdown. |
 
-| `capture_method` | Description |
-|------------------|-------------|
-| `live_intercept` | Real-time traffic interception |
-| `live_sdk_hook` | Real-time SDK callbacks |
-| `live_kernel_event` | Real-time OS events |
-| `post_hoc_log_parse` | Log parsing after the fact |
-| `snapshot` | One-time process scan |
-| `volunteered` | Agent self-reported |
-| `inferred` | Heuristic inference |
+All messages use length-prefixed framing (4-byte little-endian length prefix). Maximum frame size is 16 MiB.
 
+## C-ABI
+
+For non-Rust collectors, the SDK exposes a C-compatible ABI:
+
+| Function | Description |
+|----------|-------------|
+| `telescope_sdk_init` | Initialize the SDK, connect to the service, and register. |
+| `telescope_sdk_submit` | Submit a batch of events as a JSON string. |
+| `telescope_sdk_heartbeat` | Send a heartbeat to the service. |
+| `telescope_sdk_shutdown` | Deregister and disconnect. |
+
+See `src/crates/collector-sdk/src/ffi.rs` for the full C header and usage examples.
 
 ## Next steps
 
 - Browse `src/collectors/heartbeat/` for the simplest built-in collector.
 - Browse `src/collectors/copilot-jsonl/` for a real-world file-based collector with incremental scanning.
+- Review `src/crates/collector-sdk/` for the full SDK source and `Collector` trait definition.

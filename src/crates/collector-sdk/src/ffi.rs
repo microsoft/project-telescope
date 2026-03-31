@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! C-ABI interface for non-Rust collectors.
 //!
 //! Two usage patterns:
@@ -47,7 +50,7 @@ const ERR_NULL_POINTER: i32 = -8;
 /// Initialize the SDK: connect to the Telescope service and register.
 ///
 /// `manifest_json`: JSON string with fields `name`, `version`, `description`,
-/// and `provenance` (object with `collector_type`, `capture_method`).
+/// and `agent` (object with `agent_id`, `name`, `agent_type`, optional `version`).
 ///
 /// Returns a positive handle on success, or a negative error code on failure.
 ///
@@ -85,9 +88,10 @@ pub unsafe extern "C" fn telescope_sdk_init(manifest_json: *const c_char) -> i64
                 "name": name,
                 "version": manifest["version"].as_str().unwrap_or("0.0.0"),
                 "description": manifest["description"].as_str().unwrap_or(""),
-                "provenance": manifest.get("provenance").cloned().unwrap_or(serde_json::json!({
-                    "collector_type": "manual",
-                    "capture_method": "volunteered"
+                "agent": manifest.get("agent").cloned().unwrap_or(serde_json::json!({
+                    "agent_id": name,
+                    "name": name,
+                    "agent_type": "unknown",
                 })),
                 "pid": std::process::id(),
             }),

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 // This is a shared types crate — many constants and structs are part of the
 // public API surface but only consumed by the service side or by collector
 // authors in specific scenarios. Suppress dead_code warnings so the full

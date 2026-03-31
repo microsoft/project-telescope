@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Claude Code JSONL collector — standalone binary using the Telescope SDK.
 //!
 //! Scans `~/.claude/projects/*/*.jsonl` for session events and maps them into
@@ -10,7 +13,7 @@ mod scanner;
 
 use std::time::Duration;
 
-use telescope_collector_sdk::{Collector, CollectorManifest, EventKind, ProvenanceConfig};
+use telescope_collector_sdk::{AgentConfig, Collector, CollectorManifest, EventKind};
 
 struct ClaudeCodeJsonlCollector {
     /// Override for projects directory (for testing).
@@ -32,10 +35,15 @@ impl Collector for ClaudeCodeJsonlCollector {
             name: "claude-code-jsonl".into(),
             version: "0.1.0".into(),
             description: "Imports Claude Code session data from JSONL conversation logs.".into(),
-            provenance: ProvenanceConfig {
-                collector_type: "session_log".into(),
-                capture_method: "post_hoc_log_parse".into(),
-            },
+        }
+    }
+
+    fn agent(&self) -> AgentConfig {
+        AgentConfig {
+            agent_id: "claude-code".into(),
+            name: "Claude Code".into(),
+            agent_type: "ai-assistant".into(),
+            version: None,
         }
     }
 
@@ -84,7 +92,7 @@ impl Collector for ClaudeCodeJsonlCollector {
     }
 
     fn interval(&self) -> Duration {
-        Duration::from_secs(30)
+        Duration::from_secs(5)
     }
 
     async fn stop(&mut self) -> anyhow::Result<()> {

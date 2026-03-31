@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Heartbeat test collector — standalone binary using the Telescope SDK.
 //!
 //! Emits periodic `AgentHeartbeat` + `Custom` events as a proof of concept
@@ -5,7 +8,7 @@
 
 use std::time::Duration;
 
-use telescope_collector_sdk::{Collector, CollectorManifest, EventKind, ProvenanceConfig};
+use telescope_collector_sdk::{AgentConfig, Collector, CollectorManifest, EventKind};
 use uuid::Uuid;
 
 /// Deterministic agent UUID derived from the collector name.
@@ -34,10 +37,15 @@ impl Collector for HeartbeatCollector {
             name: "heartbeat".into(),
             version: "0.1.0".into(),
             description: "Simple test collector that emits periodic heartbeat events.".into(),
-            provenance: ProvenanceConfig {
-                collector_type: "manual".into(),
-                capture_method: "volunteered".into(),
-            },
+        }
+    }
+
+    fn agent(&self) -> AgentConfig {
+        AgentConfig {
+            agent_id: "telescope-heartbeat".into(),
+            name: "Telescope Heartbeat".into(),
+            agent_type: "test".into(),
+            version: None,
         }
     }
 

@@ -1,174 +1,257 @@
 # Project Telescope
 
-**Local-first observability for AI agents. See what your agents are actually doing.**
+**Local-first observability for AI coding agents.**
 
-AI agents are powerful — but opaque. They spawn sub-agents, call tools, read and write files, make network requests, and burn through tokens, all behind the scenes. Project Telescope gives you a window into all of it without sending a single byte off your machine.
+AI coding agents are powerful — but opaque. They spawn sub-agents, call tools, read and write files, make network requests, and burn through tokens, all behind the scenes. Project Telescope is a local-first observability layer that gives you visibility into what your agents are doing without sending a single byte off your machine.
 
-This repo contains the **collector plugin system** — the open-source layer that captures telemetry from AI agents like GitHub Copilot, Claude, and any agent with a collector. Write your own collectors for your agents and applications, or use the built-in ones. The Project Telescope service, dashboard, and CLI are available to be installed below.
+![Telescope Overview](imgs/overview.png)
 
-Read the announcement blog post: [Project Telescope](https://breviu.com/posts/telescope)
-
----
-
-## What is Project Telescope?
-
-Project Telescope is a local-first observability tool for AI agents and MCPs, giving teams cross agent visibility into what agents did, why they did it, and where they got stuck. 
-
-It works with GitHub Copilot CLI, Claude, and any agent running on your machine with a collector. It requires no changes to your agents or your MCP servers. And **all data stays on your machine** — no cloud, no telemetry leaving your system, no third parties involved.
-
-- **Faster debugging, audit trails, and iteration** — captures tool calls, conversation turns, reasoning and decisions, and friction signals in one place.
-- **Background data collectors** — feed a set of local SQLite databases (`~/.telescope/*.db`) with no manual instrumentation required.
-- **Privacy-first** — runs entirely on-device with no API keys or cloud dependency.
-- **CLI** — `tele watch`, `tele sessions`, `tele insights`, `tele export`, and more, on Windows, macOS, and Linux.
-- **Desktop dashboard**  — an app for visual exploration of agent sessions, leaderboards, and execution graphs.
-
-Think "DevTools for your AI pair programmer," purpose-built for local workflows. No config files, no API keys, no cloud accounts. Everything runs locally.
+Read the announcement blog posts: [Project Telescope](https://breviu.com/posts/telescope), [Seeing Machines Think](https://www.ghostpep.site/blog/telescope)
 
 ---
 
-<img src="imgs/sideeffectdetails.png" alt="Side effect details for a session" width="500">
-<img src="imgs/tokenusage.png" alt="Token usage tracking across agents and models" width="500">
+## Install
 
-## Quickstart
+### Windows
 
-### 1. Install Project Telescope
-
-**Windows**
-
-Download the MSI from the [releases page](https://github.com/microsoft/project-telescope/releases), then install:
+Download the MSI installer from the [latest release](https://github.com/microsoft/project-telescope/releases), or install via PowerShell:
 
 ```powershell
-msiexec /i telescope-windows-x64.msi /quiet
+irm https://raw.githubusercontent.com/microsoft/project-telescope/main/install.ps1 | iex
 ```
 
-This sets up the background service, dashboard, `tele` CLI, and all built-in collectors.
+### macOS / Linux
 
-**macOS**
-
-Coming next week.
-
-**Linux**
-
-Coming next week.
-
-The Windows installer sets up the full stack: the background service, dashboard, `tele` CLI, and all built-in collectors.
-
-### 2. Verify it's running
+Download the archive for your platform from the [latest release](https://github.com/microsoft/project-telescope/releases), extract it, and run the installer:
 
 ```bash
-tele doctor
+tar -xzf telescope-macos-arm64.tar.gz
+cd telescope-macos-arm64
+bash install.sh
 ```
 
-### 3. See what your agents are up to
+After installation, open a new terminal and run:
 
 ```bash
-tele watch        # Live stream of agent activity
-tele sessions     # Browse recent sessions
-tele insights     # Surface patterns and anomalies
-tele dashboard    # Launches the dashboard
+tele service start     # start the service + collectors
+tele service status    # verify everything is running
 ```
 
-### 4. (Optional) Build a custom collector
+---
+
+## What you get
+
+- **`tele` CLI** — query agents, sessions, turns, and side-effects from the terminal
+- **Dashboard** — a desktop app for exploring agent activity visually
+- **Built-in collectors** — Copilot JSONL, Claude Code JSONL, and MCP proxy ship out of the box
+- **Collector SDK** — build your own collectors for any AI agent (this repo contains the SDK source)
+
+![Token Usage](imgs/tokenusage.png)
+
+![Side Effect Details](imgs/sideeffectdetails.png)
+
+---
+
+## Using the CLI
+
+```bash
+tele setup                         # instrument MCP configs with the proxy
+tele status                        # service overview
+tele agents list                   # list known agents
+tele sessions list                 # list sessions
+tele sessions get <session-id>     # session details
+tele turns list <session-id>       # list turns in a session
+tele collectors list               # list loaded collectors
+```
+
+### MCP proxy
+
+Telescope includes an MCP proxy that intercepts JSON-RPC traffic between AI agents and MCP servers. Use `tele setup` to automatically instrument your existing MCP server configs:
+
+```bash
+# Instrument all known MCP configs (Copilot, Claude Desktop, Cursor, VS Code)
+tele setup
+
+# Undo and restore original configs
+tele setup --undo
+```
+
+This replaces each MCP server command in your config files with `tele proxy`, which transparently forwards traffic while capturing every tool call, resource read, and prompt. You can also use the proxy directly:
+
+```bash
+# Wrap any stdio-based MCP server
+tele proxy stdio -- npx @modelcontextprotocol/server-filesystem /path
+```
+
+Add `--json` to any command for machine-readable output.
+
+---
+
+## Privacy and data
+
+Project Telescope is **local-first** by design.
+
+- **No network egress** — data never leaves your machine.
+- **All data is user-scoped** — SQLite databases live in `~/.telescope`.
+- **No API keys, no cloud accounts, no third parties.**
+
+---
+
+## Building collectors
+
+This repository contains the open-source **Collector SDK** — the API for building out-of-process collectors that feed structured telemetry into the Telescope service.
+
+The key design principle: **every collector uses the exact same SDK interface**. There is no privileged native path — a collector you write has identical capabilities to a built-in one.
+
+### Collector SDK
+
+A collector is a standalone binary that implements the [`Collector`](src/crates/collector-sdk/src/lib.rs) trait. The SDK provides two APIs:
+
+- **Rust API** — implement the `Collector` trait and call `run()`. The SDK handles IPC connection, registration, collect loops, batching, backpressure, reconnection, and graceful shutdown.
+- **C-ABI** — link against the cdylib and call `telescope_sdk_init` / `telescope_sdk_submit` / `telescope_sdk_shutdown` for non-Rust collectors (C, Python, Go, etc.).
+
+You implement four required methods:
+
+| Method | Purpose |
+|--------|---------|
+| `manifest()` | Return collector metadata (name, version, description) |
+| `agent()` | Declare which agent this collector serves (`AgentConfig`) |
+| `collect()` | Gather and return events — called every `interval()` |
+| `interval()` | How often to call `collect()` |
+
+### Minimal example
+
+```rust
+use telescope_collector_sdk::{AgentConfig, Collector, CollectorManifest, run};
+use telescope_collector_sdk::EventKind;
+use std::time::Duration;
+
+struct MyCollector;
+
+#[async_trait::async_trait]
+impl Collector for MyCollector {
+    fn manifest(&self) -> CollectorManifest {
+        CollectorManifest {
+            name: "my-collector".into(),
+            version: "0.1.0".into(),
+            description: "My custom collector".into(),
+        }
+    }
+
+    fn agent(&self) -> AgentConfig {
+        AgentConfig {
+            agent_id: "my-agent".into(),
+            name: "My Agent".into(),
+            agent_type: "ai-assistant".into(),
+            version: None,
+        }
+    }
+
+    async fn collect(&mut self) -> anyhow::Result<Vec<EventKind>> {
+        Ok(vec![])
+    }
+
+    fn interval(&self) -> Duration {
+        Duration::from_secs(15)
+    }
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    run(MyCollector).await
+}
+```
+
+For a complete step-by-step walkthrough, see the **[Collector Authoring Guide](docs/collector-authoring-guide.md)**. For a working starter template, see the **[Hello World example](examples/hello_world/)**.
+
+### Building the SDK from source
 
 ```bash
 git clone https://github.com/microsoft/project-telescope.git
-cd project-telescope/examples
+cd project-telescope
 cargo build --release
-tele collector install ./target/release/
-tele collector enable my-custom-collector
 ```
-
-That's it. Your collector is now feeding events into the same pipeline as the built-in ones.
-
----
-
-## How it works
-
-Project Telescope has two layers: an open-source **collector** layer (this repo) and a **service** layer (installed via the install scripts or MSI).
-
-Collectors are standalone executables that watch AI agents and emit structured events. The service ingests those events, promotes them through a pipeline, and surfaces insights in the dashboard and CLI.
-
-```
-  Agent (GitHub Copilot, Claude, etc.)
-              │
-              │  stdin/stdout, JSONL files
-              ▼
-  Collector     ← you are here (open-source)
-              │
-              │  
-              ▼
-  Project Telescope Service  ← installed via install script / MSI
-              │
-        ┌─────┴─────┐
-        ▼           ▼
-   Dashboard       CLI
-```
-
-The key design principle: **every collector uses the exact same SDK interface**. There is no privileged native path. A collector you write has identical capabilities to a built-in one.
 
 ---
 
 ## Built-in collectors
 
-These ship with Project Telescope and serve as reference implementations for building your own.
+These ship with Telescope and serve as reference implementations for building your own.
 
-| Collector         | Type       | What it captures                                      |
-| ----------------- | ---------- | ----------------------------------------------------- |
-| **MCP Proxy**     | Real-time  | JSON-RPC stdin/stdout interception from any MCP agent |
-| **GitHub Copilot JSONL** | File-based | Scans `events.jsonl` session logs                |
-| **Claude JSONL**  | File-based | Imports Claude CLI exports                            |
-| **Process Scan**  | One-shot   | Discovers AI agent OS processes                       |
+| Collector | Type | What it captures |
+|-----------|------|------------------|
+| **GitHub Copilot JSONL** | File-based | Scans Copilot `events.jsonl` session logs |
+| **Claude Code JSONL** | File-based | Imports Claude Code CLI session exports |
+| **MCP Proxy** | Live intercept | Wraps MCP servers to capture JSON-RPC traffic in real time |
 
----
+Source code is in [`src/collectors/`](src/collectors/).
 
-## Writing your own collector
-
-A collector is a standalone binary that implements the [`Collector`](src/crates/collector-sdk/src/lib.rs) trait and connects to the Telescope service over IPC. The SDK handles pipe connection, registration, batching, backpressure, reconnection, and graceful shutdown — you just implement `manifest()`, `collect()`, and `interval()`.
-
-For a complete step-by-step walkthrough, see the **[Collector Authoring Guide](docs/collector-authoring-guide.md)**. For a working starter template, see the **[Hello World example](examples/hello_world/)**.
+The **Heartbeat** collector in [`src/collectors/heartbeat/`](src/collectors/heartbeat/) is an example/test collector that emits periodic events — useful as a starting point alongside the [Hello World example](examples/hello_world/).
 
 ---
 
 ## Canonical event types
 
-Collectors emit events in a canonical format. The service understands ~40 event variants across these categories:
+Collectors emit events using a shared canonical schema. The event types span these categories:
 
 | Category | Examples |
 |----------|---------|
 | **Agent** | `AgentDiscovered`, `AgentHeartbeat` |
-| **Session** | `SessionStarted`, `SessionEnded`, `SessionResumed` |
-| **Turn** | `UserMessage`, `TurnStarted`, `TurnCompleted` |
+| **Session** | `SessionStarted`, `SessionEnded`, `SessionResumed`, `SessionMetadataUpdated`, `SessionModeChanged` |
+| **Turn** | `UserMessage`, `TurnStarted`, `TurnCompleted`, `TurnStreaming` |
 | **Tool** | `ToolCallStarted`, `ToolCallCompleted` |
 | **File** | `FileRead`, `FileWritten`, `FileCreated`, `FileDeleted` |
 | **Shell** | `ShellCommandStarted`, `ShellCommandCompleted` |
 | **Sub-Agent** | `SubAgentSpawned`, `SubAgentCompleted` |
 | **Planning** | `PlanCreated`, `PlanStepCompleted`, `ThinkingBlock` |
 | **Context** | `ContextWindowSnapshot`, `ContextPruned` |
-| **Human-in-Loop** | `ApprovalRequested`, `ApprovalGranted`, `ApprovalDenied` |
-| **Self-Report** | `IntentDeclared`, `DecisionMade`, `FrustrationReported` |
+| **Human-in-Loop** | `ApprovalRequested`, `ApprovalGranted`, `ApprovalDenied`, `UserFeedback` |
+| **Self-Report** | `IntentDeclared`, `DecisionMade`, `ThoughtLogged`, `FrustrationReported`, `OutcomeReported`, `ObservationLogged`, `ConfidenceAssessed`, `AssumptionMade` |
+| **Recipes** | `RecipeFollowed`, `PathNotTaken`, `SkillInvoked` |
 | **Model** | `ModelUsed`, `ModelSwitched` |
 | **Error** | `ErrorOccurred`, `RetryAttempted` |
 | **Code** | `SearchPerformed`, `CodeChangeApplied` |
 | **Network** | `WebRequestMade`, `McpServerConnected` |
 | **Cost** | `TokenUsageReported`, `RateLimitHit` |
 | **Git** | `GitCommitCreated`, `GitBranchCreated`, `PullRequestCreated` |
+| **Hooks** | `HookStarted`, `HookCompleted` |
+| **Maintenance** | `CompactionStarted`, `CompactionCompleted` |
 | **Catch-all** | `Custom { event_type, data }` |
 
----
-
-## Privacy and data
-
-Project Telescope is local-first by design.
-
-- **No network egress.** The service never phones home or transmits data externally.
-- **All data is user-scoped** — SQLite databases live in your platform's user data directory (`%LOCALAPPDATA%` on Windows, `~/Library/Application Support` on macOS, `~/.local/share` on Linux).
+Events are serialized as internally-tagged JSON: `{ "type": "agent_discovered", "agent_id": "...", ... }`. See [`events.rs`](src/crates/collector-types/src/canonical/events.rs) for the full schema.
 
 ---
+
+## IPC protocol
+
+Collectors communicate with the Telescope service over **local named pipes** (Windows) or **Unix domain sockets** (macOS/Linux). The protocol is JSON-RPC style:
+
+1. **Connect** — the collector connects to the service's local IPC endpoint.
+2. **Register** — sends its `CollectorManifest` and `AgentConfig`.
+3. **Collect loop** — the SDK calls your `collect()` method at the configured interval, batches the returned events, and submits them over the pipe.
+4. **Shutdown** — on SIGTERM/Ctrl-C the SDK calls your `stop()` hook and disconnects cleanly.
+
+The SDK handles all protocol details — retries with exponential backoff, batching (max 500 events per submit), backpressure compliance, heartbeats, and automatic reconnection.
+
+---
+
+## Platform support
+
+| Feature | Windows | macOS | Linux |
+|---------|---------|-------|-------|
+| CLI (`tele`) | ✅ | ✅ | ✅ |
+| Service | ✅ | ✅ | ✅ |
+| Dashboard | ✅ | ✅ | ✅ |
+| Collectors | ✅ | ✅ | ✅ |
+| IPC | Named pipes | Unix sockets | Unix sockets |
+
+---
+
 ## Contributing
 
-We welcome contributions to the collector plugin system. Before submitting a pull request, you'll need to sign the [Microsoft Contributor License Agreement (CLA)](https://cla.opensource.microsoft.com/).
+This project is provided as-is. We are not currently accepting external contributions via pull requests. If you find a bug or have a feature request, please [open an issue](https://github.com/microsoft/project-telescope/issues).
 
-See [`docs/`](docs/) for the collector authoring guide and [`examples/`](examples/) for a starter template.
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 
 ---
 

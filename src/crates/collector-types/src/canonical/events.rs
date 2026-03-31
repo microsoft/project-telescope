@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Canonical event definitions — the typed intermediate representation.
 //!
 //! Each variant carries just enough data for the telescope processor to
@@ -10,11 +13,11 @@ use uuid::Uuid;
 
 use crate::provenance::Provenance;
 
-/// A canonical event ready for the telescope processor.
+/// A canonical event produced by a collector.
 ///
-/// Stored in the [`super::CanonicalStore`] after a collector processor
-/// translates raw collector data. The telescope processor reads these
-/// and promotes them into structured entities.
+/// The Telescope service wraps each `EventKind` in this struct before
+/// storage, adding metadata like provenance and timestamps. Collector
+/// authors work with `EventKind` directly — the SDK handles the rest.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanonicalEvent {
     /// Auto-assigned store row ID (0 before insertion).
@@ -23,7 +26,7 @@ pub struct CanonicalEvent {
     pub collector_id: String,
     /// When this canonical event was created.
     pub created_at: DateTime<Utc>,
-    /// Whether the telescope processor has consumed this event.
+    /// Whether this event has been processed.
     pub promoted: bool,
     /// Data provenance.
     pub provenance: Provenance,
@@ -141,6 +144,9 @@ pub enum EventKind {
         session_id: Uuid,
         /// Turn ID.
         turn_id: Uuid,
+        /// Turn index (0-based). Optional for backwards compatibility.
+        #[serde(default)]
+        turn_index: Option<u32>,
         /// User message.
         user_message: Option<String>,
         /// Assistant response.
@@ -175,6 +181,9 @@ pub enum EventKind {
         name: String,
         /// Tool arguments/input.
         arguments: Option<serde_json::Value>,
+        /// Optional session routing hint for orphaned effects.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session_id: Option<Uuid>,
     },
     /// A tool call completed.
     ToolCallCompleted {
@@ -193,6 +202,12 @@ pub enum EventKind {
     FileRead {
         /// Turn ID.
         turn_id: Uuid,
+        /// Effect ID (optional for backward compatibility).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effect_id: Option<Uuid>,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// File path.
         path: String,
     },
@@ -200,6 +215,12 @@ pub enum EventKind {
     FileWritten {
         /// Turn ID.
         turn_id: Uuid,
+        /// Effect ID (optional for backward compatibility).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effect_id: Option<Uuid>,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// File path.
         path: String,
     },
@@ -207,6 +228,12 @@ pub enum EventKind {
     FileCreated {
         /// Turn ID.
         turn_id: Uuid,
+        /// Effect ID (optional for backward compatibility).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effect_id: Option<Uuid>,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// File path.
         path: String,
     },
@@ -214,6 +241,12 @@ pub enum EventKind {
     FileDeleted {
         /// Turn ID.
         turn_id: Uuid,
+        /// Effect ID (optional for backward compatibility).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effect_id: Option<Uuid>,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// File path.
         path: String,
     },
@@ -225,6 +258,9 @@ pub enum EventKind {
         turn_id: Uuid,
         /// Effect ID.
         effect_id: Uuid,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// Command line.
         command: String,
         /// Working directory.
@@ -247,6 +283,9 @@ pub enum EventKind {
         turn_id: Uuid,
         /// Effect ID for this sub-agent spawn.
         effect_id: Uuid,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// Sub-agent name/type.
         agent_type: String,
         /// Task description.
@@ -402,6 +441,15 @@ pub enum EventKind {
         /// Why it was rejected.
         reason: String,
     },
+    /// Agent assessed its confidence level.
+    ConfidenceAssessed {
+        /// Turn ID.
+        turn_id: Uuid,
+        /// What is being assessed.
+        subject: String,
+        /// Confidence level (0.0–1.0).
+        level: f64,
+    },
     /// Agent made an assumption.
     AssumptionMade {
         /// Turn ID.
@@ -463,6 +511,12 @@ pub enum EventKind {
     SearchPerformed {
         /// Turn ID.
         turn_id: Uuid,
+        /// Effect ID (optional for backward compatibility).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effect_id: Option<Uuid>,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// Search query/pattern.
         query: String,
         /// Number of results.
@@ -483,6 +537,12 @@ pub enum EventKind {
     WebRequestMade {
         /// Turn ID.
         turn_id: Uuid,
+        /// Effect ID (optional for backward compatibility).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effect_id: Option<Uuid>,
+        /// Parent effect ID (links to the generic `ToolCallStarted`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_effect_id: Option<Uuid>,
         /// URL.
         url: String,
         /// HTTP method.
@@ -655,6 +715,7 @@ impl EventKind {
             Self::ObservationLogged { .. } => "observation_logged",
             Self::RecipeFollowed { .. } => "recipe_followed",
             Self::PathNotTaken { .. } => "path_not_taken",
+            Self::ConfidenceAssessed { .. } => "confidence_assessed",
             Self::AssumptionMade { .. } => "assumption_made",
             Self::ModelUsed { .. } => "model_used",
             Self::ModelSwitched { .. } => "model_switched",
