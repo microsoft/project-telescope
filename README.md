@@ -45,25 +45,13 @@ This sets up the background service, dashboard, `tele` CLI, and all built-in col
 
 **macOS**
 
-```bash
-# Download and extract
-tar -xzf telescope-macos-arm64.tar.gz -d ~/.telescope
-# Add to PATH
-export PATH="$HOME/.telescope:$PATH"
-./install.sh
-```
+Coming next week.
 
 **Linux**
 
-```bash
-# Download and extract
-tar -xzf telescope-linux-arm64.tar.gz -d ~/.telescope
-# Add to PATH
-export PATH="$HOME/.telescope:$PATH"
-sed -i 's/\r$//' install.sh && ./install.sh
-```
+Coming next week.
 
-All platforms install the full stack: the background service, dashboard, `tele` CLI, and all built-in collectors. On macOS and Linux, the install script also registers the service to start automatically via launchd or systemd.
+The Windows installer sets up the full stack: the background service, dashboard, `tele` CLI, and all built-in collectors.
 
 ### 2. Verify it's running
 
@@ -187,6 +175,4 @@ See [`docs/`](docs/) for the collector authoring guide and [`examples/`](example
 ## License
 
 The code in this repository is licensed under the [MIT License](LICENSE).
-
-The Project Telescope service, dashboard, and CLI are distributed as closed-source binaries under Microsoft's standard software license terms, included with the installer.
 
