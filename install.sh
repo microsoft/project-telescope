@@ -45,7 +45,6 @@ install() {
     info "Installing Project Telescope for ${OS}/${ARCH}..."
     info "Source: ${LOCAL_ARCHIVE}"
 
-    local tmp_dir
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "$tmp_dir"' EXIT
 

@@ -47,7 +47,7 @@ This sets up the background service, dashboard, `tele` CLI, and all built-in col
 
 ```bash
 # Download and extract
-tar -xzf telescope-macos-arm64.tar.gz -d ~/.telescope
+tar -xzf telescope-macos-arm64.tar.gz -C ~/.telescope
 # Add to PATH
 export PATH="$HOME/.telescope:$PATH"
 ./install.sh
@@ -57,7 +57,7 @@ export PATH="$HOME/.telescope:$PATH"
 
 ```bash
 # Download and extract
-tar -xzf telescope-linux-arm64.tar.gz -d ~/.telescope
+tar -xzf telescope-linux-arm64.tar.gz -C ~/.telescope
 # Add to PATH
 export PATH="$HOME/.telescope:$PATH"
 sed -i 's/\r$//' install.sh && ./install.sh
