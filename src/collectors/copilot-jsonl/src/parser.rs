@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Parser — typed representation of Copilot JSONL events.
 //!
 //! Each line in `events.jsonl` is a JSON object with a universal schema:

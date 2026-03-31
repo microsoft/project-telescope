@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Collector manifest — parsed from `collector.toml`.
 
 use std::path::Path;

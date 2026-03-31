@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Mapper — transforms parsed Claude Code JSONL events into canonical `EventKind` JSON.
 //!
 //! Each JSONL event type is mapped to one or more canonical events. The output

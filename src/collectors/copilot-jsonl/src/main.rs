@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Copilot JSONL collector — standalone binary using the Telescope SDK.
 //!
 //! Scans `~/.copilot/session-state/*/events.jsonl` for session events and maps
@@ -10,7 +13,7 @@ mod scanner;
 
 use std::time::Duration;
 
-use telescope_collector_sdk::{Collector, CollectorManifest, EventKind, ProvenanceConfig};
+use telescope_collector_sdk::{AgentConfig, Collector, CollectorManifest, EventKind};
 
 struct CopilotJsonlCollector {
     /// Override for session state directory (for testing).
@@ -31,11 +34,16 @@ impl Collector for CopilotJsonlCollector {
         CollectorManifest {
             name: "copilot-jsonl".into(),
             version: "0.1.0".into(),
-            description: "Imports Copilot CLI session data from JSONL event logs.".into(),
-            provenance: ProvenanceConfig {
-                collector_type: "session_log".into(),
-                capture_method: "post_hoc_log_parse".into(),
-            },
+            description: "Imports GitHub Copilot session data from JSONL event logs.".into(),
+        }
+    }
+
+    fn agent(&self) -> AgentConfig {
+        AgentConfig {
+            agent_id: "github-copilot".into(),
+            name: "GitHub Copilot".into(),
+            agent_type: "ai-assistant".into(),
+            version: None,
         }
     }
 

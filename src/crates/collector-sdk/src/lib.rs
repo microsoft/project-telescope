@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Telescope Collector SDK — build out-of-process collectors for Telescope.
 #![allow(unsafe_code)]
 //!
@@ -14,7 +17,7 @@
 //! # Quick Start (Rust)
 //!
 //! ```rust,no_run
-//! use telescope_collector_sdk::{Collector, CollectorManifest, ProvenanceConfig, run};
+//! use telescope_collector_sdk::{AgentConfig, Collector, CollectorManifest, run};
 //! use telescope_collector_types::canonical::events::EventKind;
 //! use std::time::Duration;
 //!
@@ -27,10 +30,15 @@
 //!             name: "my-collector".into(),
 //!             version: "0.1.0".into(),
 //!             description: "My custom collector".into(),
-//!             provenance: ProvenanceConfig {
-//!                 collector_type: "session_log".into(),
-//!                 capture_method: "post_hoc_log_parse".into(),
-//!             },
+//!         }
+//!     }
+//!
+//!     fn agent(&self) -> AgentConfig {
+//!         AgentConfig {
+//!             agent_id: "my-agent".into(),
+//!             name: "My Agent".into(),
+//!             agent_type: "ai-assistant".into(),
+//!             version: None,
 //!         }
 //!     }
 //!
@@ -65,28 +73,39 @@ pub struct CollectorManifest {
     pub version: String,
     /// Human-readable description.
     pub description: String,
-    /// Provenance configuration for events from this collector.
-    pub provenance: ProvenanceConfig,
 }
 
-/// Provenance settings for a collector.
+/// Agent identity declared by a collector.
+///
+/// Every collector must declare which agent it serves. The service uses
+/// this to create/upsert the agent entity and attribute all events.
 #[derive(Debug, Clone)]
-pub struct ProvenanceConfig {
-    /// Maps to a `CollectorType` variant name (e.g. `"session_log"`).
-    pub collector_type: String,
-    /// Maps to a `CaptureMethod` variant name (e.g. `"post_hoc_log_parse"`).
-    pub capture_method: String,
+pub struct AgentConfig {
+    /// Stable key for deterministic agent ID (e.g. "github-copilot").
+    pub agent_id: String,
+    /// Human-readable display name.
+    pub name: String,
+    /// Agent type (e.g. "ai-assistant").
+    pub agent_type: String,
+    /// Optional version string.
+    pub version: Option<String>,
 }
 
 /// Trait for implementing an out-of-process Telescope collector.
 ///
-/// Implement `manifest()`, `collect()`, and `interval()` at minimum.
+/// Implement `manifest()`, `agent()`, `collect()`, and `interval()` at minimum.
 /// The SDK's [`run()`] function handles the rest (pipe connection, registration,
 /// batching, backpressure, reconnection, graceful shutdown).
 #[async_trait::async_trait]
 pub trait Collector: Send + 'static {
     /// Return the collector's metadata (used for registration).
     fn manifest(&self) -> CollectorManifest;
+
+    /// Declare which agent this collector serves.
+    ///
+    /// The service creates or updates the agent entity at registration time.
+    /// All events submitted by this collector are attributed to this agent.
+    fn agent(&self) -> AgentConfig;
 
     /// Called once after the first successful connection.
     async fn start(&mut self) -> anyhow::Result<()> {

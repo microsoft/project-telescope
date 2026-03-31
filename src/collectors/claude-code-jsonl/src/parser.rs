@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Parser — typed representation of Claude Code JSONL events.
 //!
 //! Each line in a Claude Code session JSONL is a JSON object with a `type`

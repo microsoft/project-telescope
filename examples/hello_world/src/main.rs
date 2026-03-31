@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Hello World collector — the simplest possible Telescope collector.
 //!
 //! Emits a `SessionStarted` event on first run and a `Custom` "hello_world"
@@ -5,7 +8,7 @@
 
 use std::time::Duration;
 
-use telescope_collector_sdk::{Collector, CollectorManifest, EventKind, ProvenanceConfig};
+use telescope_collector_sdk::{AgentConfig, Collector, CollectorManifest, EventKind};
 use uuid::Uuid;
 
 /// Deterministic agent ID so the same collector always maps to the same agent.
@@ -46,10 +49,15 @@ impl Collector for HelloWorldCollector {
             name: "hello-world".into(),
             version: "0.1.0".into(),
             description: "A minimal hello world collector.".into(),
-            provenance: ProvenanceConfig {
-                collector_type: "manual".into(),
-                capture_method: "volunteered".into(),
-            },
+        }
+    }
+
+    fn agent(&self) -> AgentConfig {
+        AgentConfig {
+            agent_id: "hello-world".into(),
+            name: "Hello World Agent".into(),
+            agent_type: "example".into(),
+            version: Some("0.1.0".into()),
         }
     }
 

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Protocol types for the collector IPC channel.
 //!
 //! Out-of-process collectors connect to `telescope-collector` and use these
@@ -8,35 +11,40 @@ use serde::{Deserialize, Serialize};
 /// Maximum events per `collector.submit` call.
 pub const MAX_BATCH_SIZE: u32 = 500;
 
-/// Backpressure threshold: hard-reject above this many unpromoted events.
-pub const BACKPRESSURE_REJECT_THRESHOLD: u64 = 100_000;
-
 // ── collector.register ──
+
+/// Agent identity declared by a collector at registration time.
+///
+/// Every collector must know which agent it is collecting for and declare
+/// it upfront. The service uses this to create/upsert the agent entity
+/// and attribute all events.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentInfo {
+    /// Stable key for deterministic `AgentId` generation (e.g., "github-copilot").
+    pub agent_id: String,
+    /// Human-readable display name (e.g., "GitHub Copilot").
+    pub name: String,
+    /// Agent type classification (e.g., "ai-assistant").
+    pub agent_type: String,
+    /// Agent version string, if known.
+    pub version: Option<String>,
+}
 
 /// Parameters for `collector.register`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterParams {
     /// Collector name (must be unique across connected collectors).
     pub name: String,
-    /// Semantic version.
+    /// Semantic version of the collector.
     pub version: String,
     /// Human-readable description.
     pub description: String,
-    /// Provenance configuration for events from this collector.
-    pub provenance: ProvenanceParams,
+    /// The agent this collector is collecting for (required).
+    pub agent: AgentInfo,
     /// OS process ID of the collector.
     pub pid: u32,
     /// Expected interval between collect cycles (seconds). Used for health monitoring.
     pub expected_interval_secs: Option<u64>,
-}
-
-/// Provenance parameters supplied at registration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProvenanceParams {
-    /// Maps to [`CollectorType`](crate::provenance::CollectorType) variant name.
-    pub collector_type: String,
-    /// Maps to [`CaptureMethod`](crate::provenance::CaptureMethod) variant name.
-    pub capture_method: String,
 }
 
 /// Successful response to `collector.register`.
@@ -62,15 +70,15 @@ pub struct SubmitParams {
 /// Successful response to `collector.submit`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmitResponse {
-    /// Number of events accepted and inserted into the canonical store.
+    /// Number of events accepted.
     pub accepted: u32,
-    /// Suggested delay (ms) before next submit. Based on canonical store backlog.
+    /// Suggested delay (ms) before next submit.
     pub delay_hint_ms: u64,
 }
 
 // ── Backpressure ──
 
-/// Compute the delay hint based on the unpromoted event backlog.
+/// Compute the delay hint based on the event backlog.
 ///
 /// | Backlog          | Delay (ms) | Meaning              |
 /// |------------------|------------|----------------------|
@@ -87,43 +95,5 @@ pub fn compute_delay_hint(backlog: u64) -> u64 {
         20_000..50_000 => 5_000,
         50_000..100_000 => 10_000,
         _ => u64::MAX, // caller should hard-reject before reaching here
-    }
-}
-
-// ── Provenance parsing ──
-
-/// Parse a `collector_type` string into a [`CollectorType`](crate::provenance::CollectorType).
-///
-/// Returns `None` for unrecognized strings.
-#[must_use]
-pub fn parse_collector_type(s: &str) -> Option<crate::provenance::CollectorType> {
-    use crate::provenance::CollectorType;
-    match s {
-        "mcp_proxy" | "McpProxy" => Some(CollectorType::McpProxy),
-        "os_kernel" | "OsKernel" => Some(CollectorType::OsKernel),
-        "self_report" | "SelfReport" => Some(CollectorType::SelfReport),
-        "session_log" | "SessionLog" => Some(CollectorType::SessionLog),
-        "process_scan" | "ProcessScan" => Some(CollectorType::ProcessScan),
-        "copilot_sdk" | "CopilotSdk" => Some(CollectorType::CopilotSdk),
-        "manual" | "Manual" => Some(CollectorType::Manual),
-        _ => None,
-    }
-}
-
-/// Parse a `capture_method` string into a [`CaptureMethod`](crate::provenance::CaptureMethod).
-///
-/// Returns `None` for unrecognized strings.
-#[must_use]
-pub fn parse_capture_method(s: &str) -> Option<crate::provenance::CaptureMethod> {
-    use crate::provenance::CaptureMethod;
-    match s {
-        "live_intercept" | "LiveIntercept" => Some(CaptureMethod::LiveIntercept),
-        "live_kernel_event" | "LiveKernelEvent" => Some(CaptureMethod::LiveKernelEvent),
-        "live_sdk_hook" | "LiveSdkHook" => Some(CaptureMethod::LiveSdkHook),
-        "post_hoc_log_parse" | "PostHocLogParse" => Some(CaptureMethod::PostHocLogParse),
-        "snapshot" | "Snapshot" => Some(CaptureMethod::Snapshot),
-        "volunteered" | "Volunteered" => Some(CaptureMethod::Volunteered),
-        "inferred" | "Inferred" => Some(CaptureMethod::Inferred),
-        _ => None,
     }
 }

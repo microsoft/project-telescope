@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Scanner — discovers and reads Claude Code JSONL session files.
 //!
 //! Scans `~/.claude/projects/*/` for session JSONL files,

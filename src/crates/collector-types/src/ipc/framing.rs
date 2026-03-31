@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 //! Length-prefixed frame codec for IPC.
 //!
 //! Wire format: `[4-byte LE length][payload]`

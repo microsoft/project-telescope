@@ -5,6 +5,8 @@ $ErrorActionPreference = 'Stop'
 
 $Repo = "microsoft/project-telescope"
 $Version = if ($env:TELESCOPE_VERSION) { $env:TELESCOPE_VERSION } else { "latest" }
+$InstallDir = if ($env:TELESCOPE_INSTALL_DIR) { $env:TELESCOPE_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".telescope" }
+$BinDir = Join-Path $InstallDir "bin"
 
 function Get-Arch {
     switch ($env:PROCESSOR_ARCHITECTURE) {
@@ -14,58 +16,85 @@ function Get-Arch {
     }
 }
 
-function Get-DownloadUrl {
-    param([string]$Arch)
-    $AssetName = "telescope-msi-${Arch}.zip"
-    if ($Version -eq "latest") {
-        return "https://github.com/$Repo/releases/latest/download/$AssetName"
-    } else {
-        return "https://github.com/$Repo/releases/download/$Version/$AssetName"
-    }
+function Get-ReleaseTag {
+    if ($Version -ne "latest") { return $Version }
+    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
+    return $Release.tag_name
 }
 
 function Install-Telescope {
     $Arch = Get-Arch
-    $Url = Get-DownloadUrl -Arch $Arch
+    $Tag = Get-ReleaseTag
+    $Ver = $Tag -replace '^v', ''
+
+    # Prefer MSI installer on Windows
+    $MsiAsset = "telescope-${Arch}.msi"
+    $MsiUrl = "https://github.com/$Repo/releases/download/$Tag/$MsiAsset"
 
     Write-Host "Installing Project Telescope for windows/$Arch..." -ForegroundColor Cyan
-    Write-Host "Download: $Url" -ForegroundColor Cyan
 
     $TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Path $TmpDir -Force | Out-Null
 
     try {
-        $ZipPath = Join-Path $TmpDir "telescope-msi.zip"
-        $ExtractPath = Join-Path $TmpDir "extracted"
-
-        # Download
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $Url -OutFile $ZipPath -UseBasicParsing
 
-        # Extract the MSI from the zip
-        Expand-Archive -Path $ZipPath -DestinationPath $ExtractPath -Force
-
-        # Find the MSI file
-        $Msi = Get-ChildItem -Path $ExtractPath -Filter "*.msi" -Recurse | Select-Object -First 1
-        if (-not $Msi) {
-            throw "No MSI file found in the downloaded archive"
+        # Try MSI first
+        $MsiPath = Join-Path $TmpDir $MsiAsset
+        $UseMsi = $true
+        try {
+            Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath -UseBasicParsing
+        } catch {
+            $UseMsi = $false
         }
 
-        Write-Host "Running installer: $($Msi.Name)" -ForegroundColor Cyan
-
-        # Run the MSI installer
-        $MsiArgs = "/i `"$($Msi.FullName)`" /quiet /norestart"
-        $Process = Start-Process -FilePath "msiexec.exe" -ArgumentList $MsiArgs -Wait -PassThru
-
-        if ($Process.ExitCode -eq 0) {
+        if ($UseMsi) {
+            Write-Host "Installing via MSI: $MsiAsset" -ForegroundColor Cyan
+            Start-Process msiexec.exe -ArgumentList "/i `"$MsiPath`" /quiet /norestart" -Wait -NoNewWindow
             Write-Host ""
-            Write-Host "Project Telescope is installed! Run 'tele --help' to get started." -ForegroundColor Green
-            Write-Host "You may need to restart your terminal for PATH changes to take effect." -ForegroundColor Yellow
-        } elseif ($Process.ExitCode -eq 3010) {
-            Write-Host ""
-            Write-Host "Project Telescope is installed! A restart is required to complete setup." -ForegroundColor Yellow
+            Write-Host "Project Telescope installed via MSI." -ForegroundColor Green
         } else {
-            throw "MSI installer failed with exit code $($Process.ExitCode)"
+            # Fall back to zip archive
+            $ZipAsset = "telescope-${Ver}-windows-${Arch}.zip"
+            $ZipUrl = "https://github.com/$Repo/releases/download/$Tag/$ZipAsset"
+            Write-Host "Download: $ZipUrl" -ForegroundColor Cyan
+
+            $ZipPath = Join-Path $TmpDir $ZipAsset
+            $ExtractPath = Join-Path $TmpDir "extracted"
+
+            Invoke-WebRequest -Uri $ZipUrl -OutFile $ZipPath -UseBasicParsing
+            Expand-Archive -Path $ZipPath -DestinationPath $ExtractPath -Force
+
+            # Stop running instances so we can overwrite
+            Get-Process -Name "tele","telescope-service" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+
+            # Install binaries
+            New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
+            Get-ChildItem -Path $ExtractPath -Recurse -File | Where-Object { $_.Extension -ne '.d' } | ForEach-Object {
+                Copy-Item -Path $_.FullName -Destination $BinDir -Force
+            }
+
+            Write-Host ""
+            Write-Host "Project Telescope installed to ${BinDir}" -ForegroundColor Green
+
+            # Add to PATH for current user if not already present
+            $UserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+            if ($UserPath -notlike "*$BinDir*") {
+                [Environment]::SetEnvironmentVariable("PATH", "$BinDir;$UserPath", "User")
+                Write-Host "Added ${BinDir} to your user PATH." -ForegroundColor Cyan
+                Write-Host "You may need to restart your terminal for PATH changes to take effect." -ForegroundColor Yellow
+            }
+        }
+
+        # Verify
+        $TeleExe = Join-Path $BinDir "tele.exe"
+        if (Test-Path $TeleExe) {
+            & $TeleExe --version 2>$null
+            Write-Host ""
+            Write-Host "Quick reference:" -ForegroundColor White
+            Write-Host "  tele service start    - start service + collectors" -ForegroundColor Gray
+            Write-Host "  tele service status   - check service status" -ForegroundColor Gray
         }
     }
     finally {

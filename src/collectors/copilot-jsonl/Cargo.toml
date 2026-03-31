@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Collector that imports Copilot CLI session data from JSONL event logs."
+description = "Collector that imports GitHub Copilot session data from JSONL event logs."
 
 [[bin]]
 name = "telescope-collector-copilot-jsonl"
