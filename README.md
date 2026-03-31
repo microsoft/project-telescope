@@ -14,28 +14,7 @@ Read the announcement blog posts: [Project Telescope](https://breviu.com/posts/t
 
 ### Windows
 
-Download the MSI installer from the [latest release](https://github.com/microsoft/project-telescope/releases), or install via PowerShell:
-
-```powershell
-irm https://raw.githubusercontent.com/microsoft/project-telescope/main/install.ps1 | iex
-```
-
-### macOS / Linux
-
-Download the archive for your platform from the [latest release](https://github.com/microsoft/project-telescope/releases), extract it, and run the installer:
-
-```bash
-tar -xzf telescope-macos-arm64.tar.gz
-cd telescope-macos-arm64
-bash install.sh
-```
-
-After installation, open a new terminal and run:
-
-```bash
-tele service start     # start the service + collectors
-tele service status    # verify everything is running
-```
+Download the MSI installer from the [latest release](https://github.com/microsoft/project-telescope/releases).
 
 ---
 
