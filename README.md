@@ -176,5 +176,3 @@ See [`docs/`](docs/) for the collector authoring guide and [`examples/`](example
 
 The code in this repository is licensed under the [MIT License](LICENSE).
 
-The Project Telescope service, dashboard, and CLI are distributed as closed-source binaries under Microsoft's standard software license terms, included with the installer.
-
