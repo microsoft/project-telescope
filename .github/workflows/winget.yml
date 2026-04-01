@@ -1,0 +1,37 @@
+name: Submit release to WinGet community repository
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-winget:
+    name: Submit to WinGet repository
+    runs-on: windows-latest
+
+    # wingetcreate reads this env var for the GitHub token needed to submit a PR
+    env:
+      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+    # Only submit stable releases (skip prereleases and drafts)
+    if: ${{ !github.event.release.prerelease && !github.event.release.draft }}
+
+    steps:
+      - name: Submit package using wingetcreate
+        run: |
+          # Parse installer URLs from release assets
+          $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
+          $x64InstallerUrl = $assets | Where-Object -Property name -eq 'telescope-x64.msi' | Select-Object -ExpandProperty browser_download_url
+          $arm64InstallerUrl = $assets | Where-Object -Property name -eq 'telescope-arm64.msi' | Select-Object -ExpandProperty browser_download_url
+          $packageVersion = ('${{ github.event.release.tag_name }}').TrimStart('v')
+
+          Write-Host "Version: $packageVersion"
+          Write-Host "x64 URL: $x64InstallerUrl"
+          Write-Host "arm64 URL: $arm64InstallerUrl"
+
+          # Download wingetcreate and submit updated manifest
+          curl.exe -JLO https://aka.ms/wingetcreate/latest
+          .\wingetcreate.exe update Microsoft.ProjectTelescope `
+            --version $packageVersion `
+            --urls $x64InstallerUrl $arm64InstallerUrl `
+            --submit
