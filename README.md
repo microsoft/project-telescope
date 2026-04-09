@@ -39,10 +39,13 @@ sudo mv tele /usr/local/bin/
 # Example for macOS (arm64)
 curl -L https://github.com/microsoft/project-telescope/releases/download/v<VERSION>/telescope-macos-arm64 -o tele
 chmod +x tele
+xattr -d com.apple.quarantine tele
 sudo mv tele /usr/local/bin/
 ```
 
 Replace `<VERSION>` with the latest release version. Check [releases](https://github.com/microsoft/project-telescope/releases) for available binaries for your architecture.
+
+**macOS note:** The `xattr -d com.apple.quarantine tele` command removes the quarantine attribute that macOS applies to unsigned downloaded binaries. This is required to run the service on macOS.
 
 **Note:** macOS and Linux builds are provided as-is and may have limited testing compared to the official Windows release.
 
