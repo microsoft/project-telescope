@@ -8,7 +8,7 @@ AI coding agents are powerful — but opaque. They spawn sub-agents, call tools,
 
 Read the announcement blog posts: [Project Telescope](https://breviu.com/posts/telescope), [Seeing Machines Think](https://www.ghostpep.site/blog/telescope)
 
-> ⚠️ **Experimental Release** — Project Telescope is in active development. Features, APIs, and data formats may change. Use at your own risk in production environments.
+> ⚠️ **Experimental Release** — Project Telescope is in active development. Features, APIs, and data formats may change.
 
 ---
 
