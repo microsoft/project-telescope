@@ -8,13 +8,67 @@ AI coding agents are powerful — but opaque. They spawn sub-agents, call tools,
 
 Read the announcement blog posts: [Project Telescope](https://breviu.com/posts/telescope), [Seeing Machines Think](https://www.ghostpep.site/blog/telescope)
 
+> ⚠️ **Experimental Release** — Project Telescope is in active development. Features, APIs, and data formats may change.
+
 ---
 
 ## Install
 
 ### Windows
 
-Download the MSI installer from the [latest release](https://github.com/microsoft/project-telescope/releases).
+Install via [winget](https://learn.microsoft.com/en-us/windows/package-manager/):
+
+```bash
+winget install Microsoft.ProjectTelescope
+```
+
+Alternatively, download the MSI installer from the [latest release](https://github.com/microsoft/project-telescope/releases).
+
+### macOS and Linux
+
+Binaries for macOS and Linux are available in the [releases](https://github.com/microsoft/project-telescope/releases), but these are not officially supported platforms at this time.
+
+To install, download the release archive and run the install script:
+
+```bash
+# Download the archive for your platform
+curl -L https://github.com/microsoft/project-telescope/releases/download/v<VERSION>/telescope-<PLATFORM>-v<VERSION>.zip -o telescope.zip
+unzip telescope.zip
+cd telescope
+
+# Run the install script
+./install.sh
+
+# macOS only: Remove quarantine attribute from installed binaries
+xattr -d com.apple.quarantine ~/.telescope/bin/tele
+```
+
+Replace `<VERSION>` with the latest release version and `<PLATFORM>` with your platform:
+- `linux-x86_64`
+- `linux-arm64`
+- `macos-x86_64`
+- `macos-arm64`
+
+Example: `telescope-linux-arm64-v0.6.4.zip`
+
+Check [releases](https://github.com/microsoft/project-telescope/releases) for available archives for your architecture.
+
+**macOS note:** After running the install script, you must remove the quarantine attribute that macOS applies to unsigned downloaded binaries. This is required to run the service on macOS.
+
+**Note:** macOS and Linux builds are provided as-is and may have limited testing compared to the official Windows release.
+
+---
+
+## Stability and expectations
+
+This project is in **early experimental** stage. While core functionality is stable, expect:
+
+- **Data format changes** — event schemas and database formats may evolve between releases without migration tools
+- **API instability** — CLI commands and collector APIs may change between releases
+- **Breaking changes** — no semantic versioning guarantees until 1.0 release
+- **Limited platform testing** — especially on macOS and Linux
+
+Please [open an issue](https://github.com/microsoft/project-telescope/issues) to report bugs or provide feedback.
 
 ---
 
@@ -70,7 +124,6 @@ Add `--json` to any command for machine-readable output.
 
 Project Telescope is **local-first** by design.
 
-- **No network egress** — data never leaves your machine.
 - **All data is user-scoped** — SQLite databases live in `~/.telescope`.
 - **No API keys, no cloud accounts, no third parties.**
 
