@@ -28,24 +28,32 @@ Alternatively, download the MSI installer from the [latest release](https://gith
 
 Binaries for macOS and Linux are available in the [releases](https://github.com/microsoft/project-telescope/releases), but these are not officially supported platforms at this time.
 
-To install, download the appropriate binary for your platform:
+To install, download the release archive and run the install script:
 
 ```bash
-# Example for Linux x86_64
-curl -L https://github.com/microsoft/project-telescope/releases/download/v<VERSION>/telescope-linux-x86_64 -o tele
-chmod +x tele
-sudo mv tele /usr/local/bin/
+# Download the archive for your platform
+curl -L https://github.com/microsoft/project-telescope/releases/download/v<VERSION>/telescope-<PLATFORM>-v<VERSION>.zip -o telescope.zip
+unzip telescope.zip
+cd telescope
 
-# Example for macOS (arm64)
-curl -L https://github.com/microsoft/project-telescope/releases/download/v<VERSION>/telescope-macos-arm64 -o tele
-chmod +x tele
-xattr -d com.apple.quarantine tele
-sudo mv tele /usr/local/bin/
+# Run the install script
+./install.sh
+
+# macOS only: Remove quarantine attribute from installed binaries
+xattr -d com.apple.quarantine ~/.telescope/bin/tele
 ```
 
-Replace `<VERSION>` with the latest release version. Check [releases](https://github.com/microsoft/project-telescope/releases) for available binaries for your architecture.
+Replace `<VERSION>` with the latest release version and `<PLATFORM>` with your platform:
+- `linux-x86_64`
+- `linux-arm64`
+- `macos-x86_64`
+- `macos-arm64`
 
-**macOS note:** The `xattr -d com.apple.quarantine tele` command removes the quarantine attribute that macOS applies to unsigned downloaded binaries. This is required to run the service on macOS.
+Example: `telescope-linux-arm64-v0.6.4.zip`
+
+Check [releases](https://github.com/microsoft/project-telescope/releases) for available archives for your architecture.
+
+**macOS note:** After running the install script, you must remove the quarantine attribute that macOS applies to unsigned downloaded binaries. This is required to run the service on macOS.
 
 **Note:** macOS and Linux builds are provided as-is and may have limited testing compared to the official Windows release.
 
