@@ -17,7 +17,7 @@ jobs:
     if: ${{ !github.event.release.prerelease && !github.event.release.draft }}
 
     steps:
-      - name: Generate manifest using wingetcreate
+      - name: Submit updated manifest using wingetcreate
         run: |
           # Parse installer URLs from release assets
           $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
@@ -29,60 +29,11 @@ jobs:
           Write-Host "x64 URL: $x64InstallerUrl"
           Write-Host "arm64 URL: $arm64InstallerUrl"
 
-          # Download wingetcreate and generate manifest to output directory
-          $outputDir = "$env:RUNNER_TEMP\winget-manifest"
+          # Download wingetcreate and update+submit in one step.
+          # Dependencies (e.g. VCRedist) are carried forward automatically from the
+          # existing manifest in the winget-pkgs community repository.
           curl.exe -JLO https://aka.ms/wingetcreate/latest
           .\wingetcreate.exe update Microsoft.ProjectTelescope `
             --version $packageVersion `
             --urls $x64InstallerUrl $arm64InstallerUrl `
-            --out $outputDir
-
-          # wingetcreate generates a nested tree (manifests/m/Microsoft/…/<version>/).
-          # submit requires the leaf directory that directly contains the YAML files.
-          $manifestDir = Get-ChildItem $outputDir -Filter '*.yaml' -Recurse -File |
-            Select-Object -First 1 -ExpandProperty DirectoryName
-
-          Add-Content -Path $env:GITHUB_ENV -Value "MANIFEST_DIR=$manifestDir"
-
-      - name: Add VCRedist dependencies to installer manifest
-        run: |
-          $installerManifest = Get-ChildItem $env:MANIFEST_DIR -Filter '*.installer.yaml' -Recurse |
-            Select-Object -First 1
-
-          Write-Host "Patching: $($installerManifest.FullName)"
-
-          # Map each architecture to its VCRedist dependency
-          $deps = @{
-              'x64'   = 'Microsoft.VCRedist.2015+.x64'
-              'arm64' = 'Microsoft.VCRedist.2015+.arm64'
-          }
-
-          $lines = Get-Content $installerManifest.FullName
-          $result = [System.Collections.Generic.List[string]]::new()
-          $currentArch = $null
-
-          foreach ($line in $lines) {
-              $result.Add($line)
-
-              # Track which architecture block we're in
-              if ($line -match '^\s*-?\s*Architecture:\s*(\S+)') {
-                  $currentArch = $Matches[1]
-              }
-
-              # Insert Dependencies block after ProductCode for each architecture
-              if ($line -match '^\s+ProductCode:' -and $currentArch -and $deps.ContainsKey($currentArch)) {
-                  $result.Add('  Dependencies:')
-                  $result.Add('    PackageDependencies:')
-                  $result.Add("    - PackageIdentifier: $($deps[$currentArch])")
-                  $currentArch = $null
-              }
-          }
-
-          $result | Set-Content $installerManifest.FullName -Encoding UTF8NoBOM
-
-          Write-Host "--- Patched manifest ---"
-          Get-Content $installerManifest.FullName
-
-      - name: Submit patched manifest
-        run: |
-          .\wingetcreate.exe submit $env:MANIFEST_DIR
+            --submit
