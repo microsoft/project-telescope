@@ -1,23 +1,19 @@
-name: Submit release to WinGet community repository
+name: Generate WinGet release manifest
 
 on:
   release:
     types: [published]
 
 jobs:
-  publish-winget:
-    name: Submit to WinGet repository
+  generate-winget:
+    name: Generate WinGet manifest
     runs-on: windows-latest
 
-    # wingetcreate reads this env var for the GitHub token needed to submit a PR
-    env:
-      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
-
-    # Only submit stable releases (skip prereleases and drafts)
+    # Only generate manifests for stable releases.
     if: ${{ !github.event.release.prerelease && !github.event.release.draft }}
 
     steps:
-      - name: Submit updated manifest using wingetcreate
+      - name: Generate updated manifest using wingetcreate
         run: |
           # Parse installer URLs from release assets
           $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
@@ -29,11 +25,18 @@ jobs:
           Write-Host "x64 URL: $x64InstallerUrl"
           Write-Host "arm64 URL: $arm64InstallerUrl"
 
-          # Download wingetcreate and update+submit in one step.
+          # Download wingetcreate and generate the updated manifest.
           # Dependencies (e.g. VCRedist) are carried forward automatically from the
           # existing manifest in the winget-pkgs community repository.
+          $outputDir = "$env:RUNNER_TEMP\winget-manifest"
           curl.exe -JLO https://aka.ms/wingetcreate/latest
           .\wingetcreate.exe update Microsoft.ProjectTelescope `
             --version $packageVersion `
             --urls $x64InstallerUrl $arm64InstallerUrl `
-            --submit
+            --out $outputDir
+
+      - name: Upload WinGet manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: winget-manifest-${{ github.event.release.tag_name }}
+          path: ${{ runner.temp }}\winget-manifest

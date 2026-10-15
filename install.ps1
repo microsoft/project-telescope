@@ -9,6 +9,10 @@ $InstallDir = if ($env:TELESCOPE_INSTALL_DIR) { $env:TELESCOPE_INSTALL_DIR } els
 $BinDir = Join-Path $InstallDir "bin"
 
 function Get-Arch {
+    <#
+    .SYNOPSIS
+    Returns the release architecture for the current process.
+    #>
     switch ($env:PROCESSOR_ARCHITECTURE) {
         "AMD64" { return "x64" }
         "ARM64" { return "arm64" }
@@ -16,20 +20,100 @@ function Get-Arch {
     }
 }
 
-function Get-ReleaseTag {
-    if ($Version -ne "latest") { return $Version }
-    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
-    return $Release.tag_name
+function Get-Release {
+    <#
+    .SYNOPSIS
+    Returns GitHub release metadata for the requested Telescope version.
+    #>
+    if ($Version -eq "latest") {
+        return Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
+    }
+
+    $Tag = [Uri]::EscapeDataString($Version)
+    return Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$Tag" -UseBasicParsing
+}
+
+function Get-Asset {
+    <#
+    .SYNOPSIS
+    Returns a named asset from GitHub release metadata.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [object]$Release,
+
+        [Parameter(Mandatory)]
+        [string]$Name
+    )
+
+    $Asset = $Release.assets |
+        Where-Object -Property name -EQ $Name |
+        Select-Object -First 1
+
+    if (-not $Asset) {
+        throw "Release asset not found: $Name"
+    }
+
+    return $Asset
+}
+
+function Assert-AssetHash {
+    <#
+    .SYNOPSIS
+    Verifies a downloaded release asset against its GitHub SHA-256 digest.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [object]$Asset
+    )
+
+    $Sha256Pattern = '^sha256:([0-9a-fA-F]{64})$'
+    if (-not $Asset.digest -or $Asset.digest -notmatch $Sha256Pattern) {
+        throw "Release asset '$($Asset.name)' does not include a SHA-256 digest."
+    }
+
+    $ExpectedHash = $Matches[1]
+    $ActualHash = (Get-FileHash -Path $Path -Algorithm SHA256).Hash
+    if ($ActualHash -ne $ExpectedHash) {
+        throw "SHA-256 mismatch for release asset '$($Asset.name)'."
+    }
+}
+
+function Save-Asset {
+    <#
+    .SYNOPSIS
+    Downloads and verifies a GitHub release asset.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [object]$Asset,
+
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+
+    Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $Path -UseBasicParsing
+    Assert-AssetHash -Path $Path -Asset $Asset
 }
 
 function Install-Telescope {
+    <#
+    .SYNOPSIS
+    Installs the verified Telescope release for Windows.
+    #>
     $Arch = Get-Arch
-    $Tag = Get-ReleaseTag
+    $Release = Get-Release
+    $Tag = $Release.tag_name
     $Ver = $Tag -replace '^v', ''
 
     # Prefer MSI installer on Windows
-    $MsiAsset = "telescope-${Arch}.msi"
-    $MsiUrl = "https://github.com/$Repo/releases/download/$Tag/$MsiAsset"
+    $MsiAssetName = "telescope-${Arch}.msi"
+    $MsiAsset = $Release.assets |
+        Where-Object -Property name -EQ $MsiAssetName |
+        Select-Object -First 1
 
     Write-Host "Installing Project Telescope for windows/$Arch..." -ForegroundColor Cyan
 
@@ -39,30 +123,24 @@ function Install-Telescope {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-        # Try MSI first
-        $MsiPath = Join-Path $TmpDir $MsiAsset
-        $UseMsi = $true
-        try {
-            Invoke-WebRequest -Uri $MsiUrl -OutFile $MsiPath -UseBasicParsing
-        } catch {
-            $UseMsi = $false
-        }
+        if ($MsiAsset) {
+            $MsiPath = Join-Path $TmpDir $MsiAssetName
+            Save-Asset -Asset $MsiAsset -Path $MsiPath
 
-        if ($UseMsi) {
-            Write-Host "Installing via MSI: $MsiAsset" -ForegroundColor Cyan
+            Write-Host "Installing via MSI: $MsiAssetName" -ForegroundColor Cyan
             Start-Process msiexec.exe -ArgumentList "/i `"$MsiPath`" /quiet /norestart" -Wait -NoNewWindow
             Write-Host ""
             Write-Host "Project Telescope installed via MSI." -ForegroundColor Green
         } else {
             # Fall back to zip archive
-            $ZipAsset = "telescope-${Ver}-windows-${Arch}.zip"
-            $ZipUrl = "https://github.com/$Repo/releases/download/$Tag/$ZipAsset"
-            Write-Host "Download: $ZipUrl" -ForegroundColor Cyan
+            $ZipAssetName = "telescope-${Ver}-windows-${Arch}.zip"
+            $ZipAsset = Get-Asset -Release $Release -Name $ZipAssetName
+            Write-Host "Download: $($ZipAsset.browser_download_url)" -ForegroundColor Cyan
 
-            $ZipPath = Join-Path $TmpDir $ZipAsset
+            $ZipPath = Join-Path $TmpDir $ZipAssetName
             $ExtractPath = Join-Path $TmpDir "extracted"
 
-            Invoke-WebRequest -Uri $ZipUrl -OutFile $ZipPath -UseBasicParsing
+            Save-Asset -Asset $ZipAsset -Path $ZipPath
             Expand-Archive -Path $ZipPath -DestinationPath $ExtractPath -Force
 
             # Stop running instances so we can overwrite
